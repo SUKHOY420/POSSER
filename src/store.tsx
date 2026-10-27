@@ -468,9 +468,19 @@ export function POSProvider({ children }: { children: ReactNode }) {
           if (ticket) {
             syncManager.broadcast('TICKET_UPDATE', ticket);
             if (action.type === 'SEND_TO_KITCHEN') {
-              syncManager.broadcast('KITCHEN_NOTIFY', {
-                message: `Commande envoyée: ${ticket.items.filter(i => i.menuItem.isFood).length} plats`,
-              });
+              const foodCount = ticket.items.filter(i => i.menuItem.isFood).length;
+              const drinkCount = ticket.items.filter(i => !i.menuItem.isFood).length;
+              
+              if (foodCount > 0) {
+                syncManager.broadcast('KITCHEN_NOTIFY', {
+                  message: `Commande envoyée: ${foodCount} plats`,
+                });
+              }
+              if (drinkCount > 0) {
+                syncManager.broadcast('BAR_NOTIFY', {
+                  message: `Commande envoyée: ${drinkCount} boissons`,
+                });
+              }
             }
           }
         }, 0);

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Monitor, ChefHat, Tablet, Settings, Lock } from 'lucide-react';
+import { Monitor, ChefHat, Tablet, Settings, Lock, Wine } from 'lucide-react';
 import { usePOS } from '../store';
 import { Server } from '../types';
 
@@ -11,12 +11,14 @@ export default function ScreenSelect() {
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState(false);
 
-  const handleRoleSelect = (role: 'main' | 'kitchen' | 'server' | 'admin') => {
+  const handleRoleSelect = (role: 'main' | 'kitchen' | 'bar' | 'server' | 'admin') => {
     if (role === 'main') {
       dispatch({ type: 'LOGIN', payload: { id: 'admin', name: 'Admin', pin: '0000', color: '#10b981', role: 'admin' } });
       dispatch({ type: 'SET_SCREEN', payload: 'main' });
     } else if (role === 'kitchen') {
       dispatch({ type: 'SET_SCREEN', payload: 'kitchen' });
+    } else if (role === 'bar') {
+      dispatch({ type: 'SET_SCREEN', payload: 'bar' });
     } else if (role === 'admin') {
       setStep('server');
     } else {
@@ -86,6 +88,16 @@ export default function ScreenSelect() {
               <div className="text-left flex-1">
                 <p className="text-xl font-bold text-white mb-1">Écran Cuisine</p>
                 <p className="text-sm text-slate-400">KDS - Commandes à préparer</p>
+              </div>
+            </button>
+            <button onClick={() => handleRoleSelect('bar')}
+              className="w-full p-6 glass-card rounded-2xl hover-lift group flex items-center gap-5 touch-target">
+              <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform shadow-lg">
+                <Wine className="w-8 h-8 text-white" />
+              </div>
+              <div className="text-left flex-1">
+                <p className="text-xl font-bold text-white mb-1">Écran Bar</p>
+                <p className="text-sm text-slate-400">Commandes de boissons</p>
               </div>
             </button>
             <button onClick={() => handleRoleSelect('server')}

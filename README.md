@@ -12,7 +12,8 @@ Le serveur suit un workflow en 3 étapes :
 
 ### 2. **Multi-Postes Synchronisés**
 - **Caisse Principale** : Vue globale de toutes les tables en temps réel
-- **Écran Cuisine (KDS)** : Affichage des commandes à préparer
+- **Écran Cuisine (KDS)** : Affichage des commandes de nourriture à préparer
+- **Écran Bar** : Affichage des commandes de boissons à préparer
 - **Tablettes Serveurs** : Prise de commande avec validation
 - **Administration** : Gestion complète du système
 
@@ -42,7 +43,8 @@ npm run dev
 Ouvrez l'application dans **plusieurs onglets** du même navigateur :
 - Onglet 1 : Caisse Principale
 - Onglet 2 : Écran Cuisine
-- Onglet 3+ : Tablettes Serveurs
+- Onglet 3 : Écran Bar
+- Onglet 4+ : Tablettes Serveurs
 
 La synchronisation se fait automatiquement via BroadcastChannel API.
 

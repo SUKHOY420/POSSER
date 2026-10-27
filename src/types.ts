@@ -69,7 +69,7 @@ export interface Server {
   role: 'admin' | 'server';
 }
 
-export type ScreenType = 'select' | 'main' | 'kitchen' | 'server' | 'admin';
+export type ScreenType = 'select' | 'main' | 'kitchen' | 'bar' | 'server' | 'admin';
 
 export interface TicketFormat {
   showLogo: boolean;
