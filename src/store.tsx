@@ -116,6 +116,41 @@ const initialState: AppState = {
   ticketFormat: defaultTicketFormat,
 };
 
+// ============================================
+// PERSISTENCE - localStorage
+// ============================================
+const loadState = (): AppState => {
+  const saved = localStorage.getItem('quickpos-state');
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved);
+      // Convertir les dates
+      parsed.tickets = parsed.tickets.map((t: any) => ({
+        ...t,
+        createdAt: new Date(t.createdAt),
+        validatedAt: t.validatedAt ? new Date(t.validatedAt) : undefined,
+        closedAt: t.closedAt ? new Date(t.closedAt) : undefined,
+        payments: t.payments.map((p: any) => ({
+          ...p,
+          timestamp: new Date(p.timestamp)
+        }))
+      }));
+      return { ...initialState, ...parsed };
+    } catch (e) {
+      console.error('Error loading state:', e);
+    }
+  }
+  return initialState;
+};
+
+const saveState = (state: AppState) => {
+  try {
+    localStorage.setItem('quickpos-state', JSON.stringify(state));
+  } catch (e) {
+    console.error('Error saving state:', e);
+  }
+};
+
 type Action =
   | { type: 'SET_SCREEN'; payload: AppState['screen'] }
   | { type: 'LOGIN'; payload: Server }
@@ -427,9 +462,14 @@ interface ContextType {
 const POSContext = createContext<ContextType | undefined>(undefined);
 
 export function POSProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, initialState);
+  const [state, dispatch] = useReducer(reducer, initialState, loadState);
   const stateRef = useRef(state);
   stateRef.current = state;
+
+  // Sauvegarder l'état à chaque changement
+  useEffect(() => {
+    saveState(state);
+  }, [state]);
 
   const syncDispatch = useCallback((action: Action) => {
     dispatch(action);

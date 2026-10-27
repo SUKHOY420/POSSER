@@ -616,6 +616,25 @@ function SecuritySettings() {
           </div>
         </div>
       </div>
+
+      <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 mt-6">
+        <h3 className="text-lg font-bold text-red-400 mb-4">Zone de danger</h3>
+        <p className="text-sm text-slate-300 mb-4">
+          Réinitialiser toutes les données supprimera tous les tickets, paiements et configurations. 
+          Cette action est irréversible.
+        </p>
+        <button
+          onClick={() => {
+            if (confirm('Êtes-vous sûr de vouloir réinitialiser toutes les données ? Cette action est irréversible.')) {
+              localStorage.removeItem('quickpos-state');
+              window.location.reload();
+            }
+          }}
+          className="w-full py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl font-bold transition-colors"
+        >
+          Réinitialiser toutes les données
+        </button>
+      </div>
     </div>
   );
 }

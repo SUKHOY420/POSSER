@@ -14,6 +14,7 @@ export default function MainScreen() {
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [adminPassword, setAdminPassword] = useState('');
   const [passwordError, setPasswordError] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
   
   // Nouveaux états pour les modals
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
@@ -23,6 +24,19 @@ export default function MainScreen() {
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
+  }, []);
+
+  // Vérifier la dernière sauvegarde
+  useEffect(() => {
+    const checkSave = () => {
+      const saved = localStorage.getItem('quickpos-state');
+      if (saved) {
+        setLastSaved(new Date());
+      }
+    };
+    checkSave();
+    const interval = setInterval(checkSave, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   const openTickets = state.tickets.filter(t => t.status === 'OPEN' || t.status === 'DRAFT');
@@ -79,6 +93,11 @@ export default function MainScreen() {
             <p className="text-lg md:text-xl font-mono font-bold text-white">
               {currentTime.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
             </p>
+            {lastSaved && (
+              <p className="text-[10px] text-slate-400">
+                Sauvegardé à {lastSaved.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+              </p>
+            )}
           </div>
           <motion.button 
             whileHover={{ scale: 1.1 }}
