@@ -16,7 +16,7 @@ export interface Modifier {
   required: boolean;
 }
 
-export interface OrderItem {
+export interface TicketItem {
   id: string;
   menuItem: MenuItem;
   quantity: number;
@@ -27,36 +27,39 @@ export interface OrderItem {
   readyAt?: Date;
 }
 
-export interface Payment {
-  id: string;
-  method: 'cash' | 'card';
-  amount: number;
-  timestamp: Date;
-}
-
-export interface Order {
+// Un Ticket = une addition. Une table peut avoir plusieurs tickets (paiements séparés)
+export interface Ticket {
   id: string;
   tableId: string;
-  items: OrderItem[];
-  status: 'open' | 'closed' | 'paid';
+  items: TicketItem[];
+  status: 'OPEN' | 'PAID' | 'CANCELLED';
+  totalAmount: number;
+  paidAmount: number;
   createdAt: Date;
   closedAt?: Date;
   serverId: string;
   serverName: string;
   payments: Payment[];
-  subtotal: number;
   discount: number;
-  total: number;
+}
+
+export interface Payment {
+  id: string;
+  ticketId: string;
+  amount: number;
+  method: 'CASH' | 'CARD';
+  transactionRef?: string;
+  timestamp: Date;
 }
 
 export interface Table {
   id: string;
   name: string;
   seats: number;
-  status: 'free' | 'occupied' | 'reserved' | 'cleaning';
-  currentOrderId?: string;
-  paymentStatus?: 'unpaid' | 'partial' | 'paid';
-  paidAmount?: number;
+  status: 'FREE' | 'OCCUPIED' | 'PARTIALLY_PAID' | 'RESERVED' | 'CLEANING';
+  ticketIds: string[]; // Une table peut avoir plusieurs tickets
+  totalToPay: number;
+  totalPaid: number;
 }
 
 export interface Server {
@@ -87,4 +90,13 @@ export interface Session {
   totalCard: number;
   totalOrders: number;
   serverTotals: Record<string, { name: string; orders: number; revenue: number; cash: number; card: number }>;
+}
+
+// Queue d'actions pour gestion hors-ligne
+export interface PendingAction {
+  id: string;
+  type: string;
+  payload: any;
+  timestamp: Date;
+  retryCount: number;
 }
