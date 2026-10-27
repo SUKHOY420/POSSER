@@ -36,7 +36,7 @@ type Action =
   | { type: 'SET_TABLE_STATUS'; payload: { tableId: string; status: Table['status'] } }
   | { type: 'TRANSFER_TABLE'; payload: { fromId: string; toId: string } }
   | { type: 'CLOSE_SESSION' }
-  // Sync actions (reçues d'autres postes)
+  // Sync actions
   | { type: 'SYNC_ADD_ORDER'; payload: Order }
   | { type: 'SYNC_UPDATE_ORDER'; payload: Order }
   | { type: 'SYNC_CLOSE_ORDER'; payload: string }
@@ -130,7 +130,6 @@ function reducer(state: State, action: Action): State {
       const table = state.tables.find(t => t.id === tableId);
       if (!table) return state;
 
-      // Check if table already has an open order
       const existingOrder = state.orders.find(o => o.tableId === tableId && o.status === 'open');
       if (existingOrder) {
         return {
@@ -308,7 +307,6 @@ function reducer(state: State, action: Action): State {
         t.id === order.tableId ? { ...t, status: 'free' as const, currentOrderId: undefined } : t
       );
 
-      // Update session
       const newSession = updateSessionFromOrder(state.session, { ...order, status: 'closed', closedAt: new Date() });
 
       return {
@@ -362,7 +360,7 @@ function reducer(state: State, action: Action): State {
       };
     }
 
-    // ===== SYNC ACTIONS (reçues d'autres postes) =====
+    // ===== SYNC ACTIONS =====
     
     case 'SYNC_ADD_ORDER': {
       const newOrder = action.payload;
@@ -505,30 +503,48 @@ const POSContext = createContext<ContextType | undefined>(undefined);
 
 export function POSProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
+  
+  // Ref pour garder le state le plus récent
+  const stateRef = React.useRef(state);
+  stateRef.current = state;
 
   // Wrapper dispatch qui broadcast les changements
   const syncDispatch = React.useCallback((action: Action) => {
     // Dispatch local
     dispatch(action);
 
-    // Broadcast aux autres postes
+    // Broadcast aux autres postes (sauf pour les actions SYNC)
+    if (action.type.startsWith('SYNC_')) return;
+
+    const currentState = stateRef.current;
+
     switch (action.type) {
       case 'OPEN_TABLE': {
-        // Le broadcast sera fait dans un useEffect après que l'ordre soit créé
+        // Broadcast la table occupée immédiatement
+        syncManager.broadcast('TABLE_STATUS_CHANGED', { tableId: action.payload, status: 'occupied' });
+        
+        // Créer l'ordre et le broadcaster après un court délai
+        // pour laisser le reducer mettre à jour le state
+        setTimeout(() => {
+          const latestState = stateRef.current;
+          const order = latestState.orders.find(o => o.tableId === action.payload && o.status === 'open');
+          if (order) {
+            syncManager.broadcast('ORDER_CREATED', { order });
+          }
+        }, 50);
         break;
       }
 
       case 'ADD_ITEM':
-        syncManager.broadcast({ type: 'ITEM_ADDED', orderId: action.payload.orderId, item: action.payload.item });
+        syncManager.broadcast('ITEM_ADDED', action.payload);
         break;
 
       case 'REMOVE_ITEM':
-        syncManager.broadcast({ type: 'ITEM_REMOVED', orderId: action.payload.orderId, itemId: action.payload.itemId });
+        syncManager.broadcast('ITEM_REMOVED', action.payload);
         break;
 
       case 'UPDATE_QTY':
-        syncManager.broadcast({ 
-          type: 'ITEM_UPDATED', 
+        syncManager.broadcast('ITEM_UPDATED', { 
           orderId: action.payload.orderId, 
           itemId: action.payload.itemId, 
           updates: { quantity: action.payload.qty } 
@@ -536,8 +552,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
         break;
 
       case 'UPDATE_NOTES':
-        syncManager.broadcast({ 
-          type: 'ITEM_UPDATED', 
+        syncManager.broadcast('ITEM_UPDATED', { 
           orderId: action.payload.orderId, 
           itemId: action.payload.itemId, 
           updates: { notes: action.payload.notes } 
@@ -545,11 +560,14 @@ export function POSProvider({ children }: { children: ReactNode }) {
         break;
 
       case 'SEND_TO_KITCHEN':
-        syncManager.broadcast({ type: 'ORDER_SENT_TO_KITCHEN', orderId: action.payload });
-        const order = state.orders.find(o => o.id === action.payload);
-        if (order) {
-          const table = state.tables.find(t => t.id === order.tableId);
-          syncManager.notifyNewOrder(action.payload, table?.name || '?', order.serverName);
+        syncManager.broadcast('ORDER_SENT_TO_KITCHEN', { orderId: action.payload });
+        const kitchenOrder = currentState.orders.find(o => o.id === action.payload);
+        if (kitchenOrder) {
+          const table = currentState.tables.find(t => t.id === kitchenOrder.tableId);
+          syncManager.broadcast('KITCHEN_NOTIFICATION', { 
+            orderId: action.payload, 
+            message: `Nouvelle commande ${table?.name || '?'} par ${kitchenOrder.serverName}` 
+          });
         }
         break;
 
@@ -558,50 +576,43 @@ export function POSProvider({ children }: { children: ReactNode }) {
       case 'MARK_SERVED': {
         const status = action.type === 'MARK_PREPARING' ? 'preparing' : 
                        action.type === 'MARK_READY' ? 'ready' : 'served';
-        syncManager.broadcast({ 
-          type: 'ITEM_STATUS_CHANGED', 
+        syncManager.broadcast('ITEM_STATUS_CHANGED', { 
           orderId: action.payload.orderId, 
           itemId: action.payload.itemId, 
           status 
         });
         if (status === 'ready') {
-          const order = state.orders.find(o => o.id === action.payload.orderId);
-          if (order) {
-            const table = state.tables.find(t => t.id === order.tableId);
-            syncManager.notifyOrderReady(action.payload.orderId, table?.name || '?');
+          const readyOrder = currentState.orders.find(o => o.id === action.payload.orderId);
+          if (readyOrder) {
+            const table = currentState.tables.find(t => t.id === readyOrder.tableId);
+            syncManager.broadcast('SERVER_NOTIFICATION', { 
+              message: `Commande ${table?.name || '?'} prête !`, 
+              from: 'Cuisine' 
+            });
           }
         }
         break;
       }
 
       case 'PROCESS_PAYMENT':
-        syncManager.broadcast({ 
-          type: 'PAYMENT_PROCESSED', 
-          orderId: action.payload.orderId, 
-          method: action.payload.method, 
-          amount: action.payload.amount 
-        });
+        syncManager.broadcast('PAYMENT_PROCESSED', action.payload);
         break;
 
       case 'CLOSE_ORDER':
-        syncManager.broadcast({ type: 'ORDER_CLOSED', orderId: action.payload });
-        const closedOrder = state.orders.find(o => o.id === action.payload);
+        syncManager.broadcast('ORDER_CLOSED', { orderId: action.payload });
+        const closedOrder = currentState.orders.find(o => o.id === action.payload);
         if (closedOrder) {
-          syncManager.broadcast({ type: 'TABLE_STATUS_CHANGED', tableId: closedOrder.tableId, status: 'free' });
+          syncManager.broadcast('TABLE_STATUS_CHANGED', { tableId: closedOrder.tableId, status: 'free' });
         }
         break;
 
       case 'SET_TABLE_STATUS':
-        syncManager.broadcast({ 
-          type: 'TABLE_STATUS_CHANGED', 
-          tableId: action.payload.tableId, 
-          status: action.payload.status 
-        });
+        syncManager.broadcast('TABLE_STATUS_CHANGED', action.payload);
         break;
     }
-  }, [state]);
+  }, []);
 
-  // Initialiser la synchronisation quand le type de poste change
+  // Initialiser la synchronisation
   useEffect(() => {
     if (state.screen === 'main' || state.screen === 'kitchen' || state.screen === 'server') {
       const postType = state.screen as 'main' | 'kitchen' | 'server';
@@ -610,89 +621,49 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
   }, [state.screen, state.currentServer]);
 
-  // Surveiller les changements et broadcaster
-  const prevOrdersRef = React.useRef<Order[]>([]);
-  useEffect(() => {
-    const prevOrders = prevOrdersRef.current;
-    const currentOrders = state.orders;
-
-    // Détecter les nouveaux ordres
-    currentOrders.forEach(order => {
-      const prevOrder = prevOrders.find(o => o.id === order.id);
-      if (!prevOrder) {
-        // Nouvel ordre créé
-        syncManager.broadcast({ type: 'ORDER_CREATED', order });
-      } else {
-        // Détecter les changements
-        if (JSON.stringify(prevOrder.items) !== JSON.stringify(order.items)) {
-          syncManager.broadcast({ type: 'ORDER_UPDATED', order });
-        }
-        if (prevOrder.status !== order.status && order.status === 'closed') {
-          syncManager.broadcast({ type: 'ORDER_CLOSED', orderId: order.id });
-        }
-      }
-    });
-
-    prevOrdersRef.current = currentOrders;
-  }, [state.orders]);
-
   // Écouter les événements de synchronisation
   useEffect(() => {
     const unsubs: (() => void)[] = [];
 
-    unsubs.push(syncManager.on('ORDER_CREATED', (event: any) => {
-      dispatch({ type: 'SYNC_ADD_ORDER', payload: event.order });
+    unsubs.push(syncManager.on('ORDER_CREATED', (payload: any) => {
+      console.log('[Store] Reçu ORDER_CREATED:', payload);
+      dispatch({ type: 'SYNC_ADD_ORDER', payload: payload.order });
     }));
 
-    unsubs.push(syncManager.on('ORDER_UPDATED', (event: any) => {
-      dispatch({ type: 'SYNC_UPDATE_ORDER', payload: event.order });
+    unsubs.push(syncManager.on('ORDER_UPDATED', (payload: any) => {
+      dispatch({ type: 'SYNC_UPDATE_ORDER', payload: payload.order });
     }));
 
-    unsubs.push(syncManager.on('ORDER_CLOSED', (event: any) => {
-      dispatch({ type: 'SYNC_CLOSE_ORDER', payload: event.orderId });
+    unsubs.push(syncManager.on('ORDER_CLOSED', (payload: any) => {
+      dispatch({ type: 'SYNC_CLOSE_ORDER', payload: payload.orderId });
     }));
 
-    unsubs.push(syncManager.on('ITEM_ADDED', (event: any) => {
-      dispatch({ type: 'SYNC_ADD_ITEM', payload: { orderId: event.orderId, item: event.item } });
+    unsubs.push(syncManager.on('ITEM_ADDED', (payload: any) => {
+      dispatch({ type: 'SYNC_ADD_ITEM', payload });
     }));
 
-    unsubs.push(syncManager.on('ITEM_REMOVED', (event: any) => {
-      dispatch({ type: 'SYNC_REMOVE_ITEM', payload: { orderId: event.orderId, itemId: event.itemId } });
+    unsubs.push(syncManager.on('ITEM_REMOVED', (payload: any) => {
+      dispatch({ type: 'SYNC_REMOVE_ITEM', payload });
     }));
 
-    unsubs.push(syncManager.on('ITEM_UPDATED', (event: any) => {
-      dispatch({ type: 'SYNC_UPDATE_ITEM', payload: { 
-        orderId: event.orderId, 
-        itemId: event.itemId, 
-        updates: event.updates 
-      }});
+    unsubs.push(syncManager.on('ITEM_UPDATED', (payload: any) => {
+      dispatch({ type: 'SYNC_UPDATE_ITEM', payload });
     }));
 
-    unsubs.push(syncManager.on('ORDER_SENT_TO_KITCHEN', (event: any) => {
-      dispatch({ type: 'SYNC_SEND_TO_KITCHEN', payload: event.orderId });
+    unsubs.push(syncManager.on('ORDER_SENT_TO_KITCHEN', (payload: any) => {
+      dispatch({ type: 'SYNC_SEND_TO_KITCHEN', payload: payload.orderId });
     }));
 
-    unsubs.push(syncManager.on('ITEM_STATUS_CHANGED', (event: any) => {
-      dispatch({ type: 'SYNC_ITEM_STATUS', payload: { 
-        orderId: event.orderId, 
-        itemId: event.itemId, 
-        status: event.status 
-      }});
+    unsubs.push(syncManager.on('ITEM_STATUS_CHANGED', (payload: any) => {
+      dispatch({ type: 'SYNC_ITEM_STATUS', payload });
     }));
 
-    unsubs.push(syncManager.on('TABLE_STATUS_CHANGED', (event: any) => {
-      dispatch({ type: 'SYNC_TABLE_STATUS', payload: { 
-        tableId: event.tableId, 
-        status: event.status 
-      }});
+    unsubs.push(syncManager.on('TABLE_STATUS_CHANGED', (payload: any) => {
+      dispatch({ type: 'SYNC_TABLE_STATUS', payload });
     }));
 
-    unsubs.push(syncManager.on('PAYMENT_PROCESSED', (event: any) => {
-      dispatch({ type: 'SYNC_PAYMENT', payload: { 
-        orderId: event.orderId, 
-        method: event.method, 
-        amount: event.amount 
-      }});
+    unsubs.push(syncManager.on('PAYMENT_PROCESSED', (payload: any) => {
+      dispatch({ type: 'SYNC_PAYMENT', payload });
     }));
 
     return () => {

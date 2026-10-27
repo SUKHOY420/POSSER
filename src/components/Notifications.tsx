@@ -44,6 +44,15 @@ export function NotificationSystem() {
       });
     }));
 
+    // Notifications de nouvelles commandes pour la caisse
+    unsubs.push(syncManager.on('ORDER_CREATED', (event: any) => {
+      addNotification({
+        type: 'order',
+        title: '📝 Nouvelle commande',
+        message: `Table ${event.order?.tableId || '?'} par ${event.order?.serverName || '?'}`,
+      });
+    }));
+
     return () => {
       unsubs.forEach(unsub => unsub());
     };

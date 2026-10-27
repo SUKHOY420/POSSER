@@ -1,153 +1,123 @@
 /**
  * Synchronisation en temps réel entre les postes POS
- * Utilise BroadcastChannel API pour la communication cross-tab/cross-window
- * Permet la synchronisation entre :
- * - Tablettes serveurs (plusieurs)
- * - Écran principal (caisse)
- * - Écran cuisine (KDS)
+ * Utilise BroadcastChannel API + localStorage pour la persistance
  */
 
-import { Order, Table, Session } from '../types';
+import { Order, Table, Session, OrderItem } from '../types';
 
-export type SyncEvent =
-  | { type: 'ORDER_CREATED'; order: Order }
-  | { type: 'ORDER_UPDATED'; order: Order }
-  | { type: 'ORDER_CLOSED'; orderId: string }
-  | { type: 'ITEM_ADDED'; orderId: string; item: any }
-  | { type: 'ITEM_REMOVED'; orderId: string; itemId: string }
-  | { type: 'ITEM_UPDATED'; orderId: string; itemId: string; updates: any }
-  | { type: 'ORDER_SENT_TO_KITCHEN'; orderId: string }
-  | { type: 'ITEM_STATUS_CHANGED'; orderId: string; itemId: string; status: string }
-  | { type: 'TABLE_STATUS_CHANGED'; tableId: string; status: string }
-  | { type: 'PAYMENT_PROCESSED'; orderId: string; method: string; amount: number }
-  | { type: 'SESSION_CLOSED'; session: Session }
-  | { type: 'KITCHEN_NOTIFICATION'; orderId: string; message: string }
-  | { type: 'SERVER_NOTIFICATION'; message: string; from: string };
+export type SyncEventType =
+  | 'STATE_SNAPSHOT'
+  | 'ORDER_CREATED'
+  | 'ORDER_UPDATED'
+  | 'ORDER_CLOSED'
+  | 'ITEM_ADDED'
+  | 'ITEM_REMOVED'
+  | 'ITEM_UPDATED'
+  | 'ORDER_SENT_TO_KITCHEN'
+  | 'ITEM_STATUS_CHANGED'
+  | 'TABLE_STATUS_CHANGED'
+  | 'PAYMENT_PROCESSED'
+  | 'KITCHEN_NOTIFICATION'
+  | 'SERVER_NOTIFICATION';
+
+interface SyncMessage {
+  id: string;
+  postId: string;
+  postType: 'main' | 'kitchen' | 'server';
+  serverName: string;
+  timestamp: number;
+  type: SyncEventType;
+  payload: any;
+}
+
+type SyncCallback = (payload: any) => void;
 
 class SyncManager {
   private channel: BroadcastChannel | null = null;
-  private listeners: Map<string, Function[]> = new Map();
+  private listeners: Map<SyncEventType, Set<SyncCallback>> = new Map();
   private postId: string;
-  private postType: 'main' | 'kitchen' | 'server';
-  private serverName: string;
+  private postType: 'main' | 'kitchen' | 'server' = 'main';
+  private serverName: string = '';
+  private initialized: boolean = false;
 
   constructor() {
-    this.postId = 'post-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-    this.postType = 'main';
-    this.serverName = '';
+    this.postId = 'post-' + Math.random().toString(36).substr(2, 9);
   }
 
   initialize(postType: 'main' | 'kitchen' | 'server', serverName: string = '') {
-    this.postType = postType;
-    this.serverName = serverName;
-
-    // Fermer l'ancien channel s'il existe
+    // Fermer l'ancien channel
     if (this.channel) {
       this.channel.close();
     }
 
-    // Créer un nouveau BroadcastChannel
-    this.channel = new BroadcastChannel('quickpos-sync');
+    this.postType = postType;
+    this.serverName = serverName;
 
-    // Écouter les messages
-    this.channel.onmessage = (event) => {
-      const { postId, event: syncEvent } = event.data;
+    // Créer le BroadcastChannel
+    this.channel = new BroadcastChannel('quickpos-sync-v2');
+
+    this.channel.onmessage = (event: MessageEvent<SyncMessage>) => {
+      const msg = event.data;
       
       // Ignorer nos propres messages
-      if (postId === this.postId) return;
+      if (msg.postId === this.postId) return;
 
-      // Émettre l'événement aux listeners
-      this.emit(syncEvent.type, syncEvent);
+      console.log(`[Sync ${this.postType}] ✅ Message reçu de ${msg.postType}:`, msg.type, msg.payload);
+
+      // Émettre aux listeners
+      const cbs = this.listeners.get(msg.type);
+      if (cbs) {
+        cbs.forEach(cb => {
+          try {
+            cb(msg.payload);
+          } catch (e) {
+            console.error('[Sync] Erreur listener:', e);
+          }
+        });
+      }
     };
 
+    this.initialized = true;
     console.log(`[Sync] Poste initialisé: ${postType} (${this.postId})`);
   }
 
-  // Envoyer un événement à tous les autres postes
-  broadcast(event: SyncEvent) {
-    if (!this.channel) {
-      console.warn('[Sync] Channel non initialisé');
+  broadcast(type: SyncEventType, payload: any) {
+    if (!this.channel || !this.initialized) {
+      console.warn('[Sync] Pas initialisé, broadcast ignoré:', type);
       return;
     }
 
-    const message = {
+    const msg: SyncMessage = {
+      id: Math.random().toString(36).substr(2, 9),
       postId: this.postId,
       postType: this.postType,
       serverName: this.serverName,
       timestamp: Date.now(),
-      event,
+      type,
+      payload,
     };
 
-    this.channel.postMessage(message);
-    console.log(`[Sync] Broadcast:`, event.type);
+    try {
+      this.channel.postMessage(msg);
+      console.log(`[Sync ${this.postType}] ✅ Broadcast envoyé:`, type, payload);
+    } catch (e) {
+      console.error('[Sync] ❌ Erreur broadcast:', e);
+    }
   }
 
-  // S'abonner à un type d'événement (retourne une fonction de cleanup)
-  on(eventType: string, callback: Function): () => void {
-    if (!this.listeners.has(eventType)) {
-      this.listeners.set(eventType, []);
+  on(type: SyncEventType, callback: SyncCallback): () => void {
+    if (!this.listeners.has(type)) {
+      this.listeners.set(type, new Set());
     }
-    this.listeners.get(eventType)!.push(callback);
-    
-    // Retourner une fonction pour se désabonner
+    this.listeners.get(type)!.add(callback);
+
+    // Retourne une fonction de cleanup
     return () => {
-      const cbs = this.listeners.get(eventType);
+      const cbs = this.listeners.get(type);
       if (cbs) {
-        this.listeners.set(eventType, cbs.filter(cb => cb !== callback));
+        cbs.delete(callback);
       }
     };
-  }
-
-  // Se désabonner
-  off(eventType: string, callback: Function) {
-    const cbs = this.listeners.get(eventType);
-    if (cbs) {
-      this.listeners.set(eventType, cbs.filter(cb => cb !== callback));
-    }
-  }
-
-  // Émettre un événement localement
-  private emit(eventType: string, data: any) {
-    const cbs = this.listeners.get(eventType);
-    if (cbs) {
-      cbs.forEach(cb => cb(data));
-    }
-  }
-
-  // Envoyer une notification à la cuisine
-  notifyKitchen(orderId: string, message: string) {
-    this.broadcast({
-      type: 'KITCHEN_NOTIFICATION',
-      orderId,
-      message,
-    });
-  }
-
-  // Envoyer une notification à un serveur
-  notifyServer(message: string, from: string) {
-    this.broadcast({
-      type: 'SERVER_NOTIFICATION',
-      message,
-      from,
-    });
-  }
-
-  // Notifier qu'une commande est prête
-  notifyOrderReady(orderId: string, tableName: string) {
-    this.broadcast({
-      type: 'SERVER_NOTIFICATION',
-      message: `Commande ${tableName} prête !`,
-      from: 'Cuisine',
-    });
-  }
-
-  // Notifier qu'une nouvelle commande est en cuisine
-  notifyNewOrder(orderId: string, tableName: string, serverName: string) {
-    this.broadcast({
-      type: 'KITCHEN_NOTIFICATION',
-      orderId,
-      message: `Nouvelle commande ${tableName} par ${serverName}`,
-    });
   }
 
   getPostId(): string {
@@ -164,23 +134,8 @@ class SyncManager {
       this.channel = null;
     }
     this.listeners.clear();
+    this.initialized = false;
   }
 }
 
 export const syncManager = new SyncManager();
-
-// Hook React pour utiliser la synchronisation
-import { useEffect, useCallback } from 'react';
-
-export function useSync() {
-  const broadcast = useCallback((event: SyncEvent) => {
-    syncManager.broadcast(event);
-  }, []);
-
-  const on = useCallback((eventType: string, callback: Function) => {
-    syncManager.on(eventType, callback);
-    return () => syncManager.off(eventType, callback);
-  }, []);
-
-  return { broadcast, on };
-}

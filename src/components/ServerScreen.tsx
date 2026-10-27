@@ -37,6 +37,7 @@ export default function ServerScreen() {
   });
 
   const handleTableClick = (tableId: string) => {
+    console.log('[ServerScreen] Ouverture table:', tableId, 'par', server?.name);
     dispatch({ type: 'OPEN_TABLE', payload: tableId });
     setView('order');
   };

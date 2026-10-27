@@ -12,7 +12,7 @@ export function SyncIndicator() {
     setPostType(syncManager.getPostType());
 
     // Écouter les événements de sync
-    const events = [
+    const events: Array<Parameters<typeof syncManager.on>[0]> = [
       'ORDER_CREATED', 'ORDER_UPDATED', 'ORDER_CLOSED',
       'ITEM_ADDED', 'ITEM_REMOVED', 'ITEM_UPDATED',
       'ORDER_SENT_TO_KITCHEN', 'ITEM_STATUS_CHANGED',

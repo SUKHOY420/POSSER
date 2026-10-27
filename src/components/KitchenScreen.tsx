@@ -43,7 +43,7 @@ export default function KitchenScreen() {
       }
       setTimeout(() => setNewOrderAlert(false), 3000);
     });
-    return unsub;
+    return () => { if (unsub) unsub(); };
   }, []);
 
   const kitchenOrders: KitchenOrder[] = state.orders
