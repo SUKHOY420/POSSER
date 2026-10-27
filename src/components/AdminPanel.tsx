@@ -3,14 +3,14 @@ import { motion } from 'framer-motion';
 import { v4 as uuidv4 } from 'uuid';
 import {
   Package, Users, Table as TableIcon, Receipt, Settings, BarChart3,
-  Plus, Edit, Trash2, Save, X, LogOut, Download, Filter
+  Plus, Edit, Trash2, Save, X, LogOut, Download, Filter, Shield, Lock
 } from 'lucide-react';
 import { usePOS } from '../store';
 import { MenuItem, Table, Server, TicketFormat } from '../types';
 
 export default function AdminPanel() {
   const { state, dispatch } = usePOS();
-  const [activeTab, setActiveTab] = useState<'products' | 'tables' | 'servers' | 'tickets' | 'format' | 'reports'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'tables' | 'servers' | 'tickets' | 'format' | 'reports' | 'security'>('products');
 
   const tabs = [
     { id: 'products', label: 'Produits', icon: Package },
@@ -19,6 +19,7 @@ export default function AdminPanel() {
     { id: 'tickets', label: 'Tickets', icon: Receipt },
     { id: 'format', label: 'Format', icon: Settings },
     { id: 'reports', label: 'Rapports', icon: BarChart3 },
+    { id: 'security', label: 'Sécurité', icon: Shield },
   ];
 
   return (
@@ -60,6 +61,7 @@ export default function AdminPanel() {
         {activeTab === 'tickets' && <TicketsManager />}
         {activeTab === 'format' && <FormatManager />}
         {activeTab === 'reports' && <ReportsView />}
+        {activeTab === 'security' && <SecuritySettings />}
       </div>
     </div>
   );
@@ -472,6 +474,147 @@ function TicketsManager() {
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+// ============================================
+// SECURITY SETTINGS
+// ============================================
+function SecuritySettings() {
+  const { state, dispatch } = usePOS();
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const adminServer = state.servers.find(s => s.role === 'admin');
+
+  const handleChangePassword = () => {
+    if (!adminServer) {
+      setMessage({ type: 'error', text: 'Aucun administrateur trouvé' });
+      return;
+    }
+
+    if (currentPassword !== adminServer.pin) {
+      setMessage({ type: 'error', text: 'Mot de passe actuel incorrect' });
+      setTimeout(() => setMessage(null), 3000);
+      return;
+    }
+
+    if (newPassword.length < 4) {
+      setMessage({ type: 'error', text: 'Le nouveau mot de passe doit contenir au moins 4 caractères' });
+      setTimeout(() => setMessage(null), 3000);
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setMessage({ type: 'error', text: 'Les mots de passe ne correspondent pas' });
+      setTimeout(() => setMessage(null), 3000);
+      return;
+    }
+
+    dispatch({
+      type: 'UPDATE_SERVER',
+      payload: { ...adminServer, pin: newPassword }
+    });
+
+    setMessage({ type: 'success', text: 'Mot de passe modifié avec succès' });
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setTimeout(() => setMessage(null), 3000);
+  };
+
+  return (
+    <div>
+      <h2 className="text-xl font-bold text-white mb-4">Sécurité</h2>
+
+      <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6 mb-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center">
+            <Lock className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-white">Mot de passe administrateur</h3>
+            <p className="text-sm text-slate-400">Modifier le mot de passe pour accéder aux paramètres</p>
+          </div>
+        </div>
+
+        {message && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`mb-4 p-3 rounded-lg ${
+              message.type === 'success' ? 'bg-emerald-500/20 border border-emerald-500/50 text-emerald-400' :
+              'bg-red-500/20 border border-red-500/50 text-red-400'
+            }`}
+          >
+            {message.text}
+          </motion.div>
+        )}
+
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm text-slate-400 mb-1 block">Mot de passe actuel</label>
+            <input
+              type="password"
+              value={currentPassword}
+              onChange={e => setCurrentPassword(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
+              placeholder="••••"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm text-slate-400 mb-1 block">Nouveau mot de passe</label>
+            <input
+              type="password"
+              value={newPassword}
+              onChange={e => setNewPassword(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
+              placeholder="••••"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm text-slate-400 mb-1 block">Confirmer le nouveau mot de passe</label>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={e => setConfirmPassword(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
+              placeholder="••••"
+            />
+          </div>
+
+          <button
+            onClick={handleChangePassword}
+            disabled={!currentPassword || !newPassword || !confirmPassword}
+            className="w-full py-3 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 disabled:from-slate-600 disabled:to-slate-700 text-white rounded-xl font-bold transition-all"
+          >
+            Modifier le mot de passe
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6">
+        <h3 className="text-lg font-bold text-white mb-4">Informations de sécurité</h3>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg">
+            <span className="text-sm text-slate-300">Administrateur actuel</span>
+            <span className="text-sm font-medium text-white">{adminServer?.name || 'Non défini'}</span>
+          </div>
+          <div className="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg">
+            <span className="text-sm text-slate-300">Nombre de serveurs</span>
+            <span className="text-sm font-medium text-white">{state.servers.filter(s => s.role === 'server').length}</span>
+          </div>
+          <div className="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg">
+            <span className="text-sm text-slate-300">Protection activée</span>
+            <span className="text-sm font-medium text-emerald-400">✓ Oui</span>
+          </div>
+        </div>
       </div>
     </div>
   );

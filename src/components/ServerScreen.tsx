@@ -11,7 +11,7 @@ import { categories } from '../data';
 
 export default function ServerScreen() {
   const { state, dispatch } = usePOS();
-  const [view, setView] = useState<'tables' | 'order' | 'validate'>('tables');
+  const [view, setView] = useState<'tables' | 'order'>('tables');
   const [activeCategory, setActiveCategory] = useState('Tous');
   const [searchQuery, setSearchQuery] = useState('');
   const [showPayment, setShowPayment] = useState(false);
@@ -50,7 +50,8 @@ export default function ServerScreen() {
   const handleValidate = () => {
     if (!state.currentTicketId || !currentTicket) return;
     dispatch({ type: 'VALIDATE_TICKET', payload: state.currentTicketId });
-    setView('validate');
+    // Rediriger automatiquement vers les tables après validation
+    setView('tables');
   };
 
   const handleSendToKitchen = () => {
@@ -146,60 +147,7 @@ export default function ServerScreen() {
     );
   }
 
-  // View validate (après validation)
-  if (view === 'validate' && currentTicket?.status === 'OPEN') {
-    return (
-      <div className="h-screen flex flex-col bg-slate-900">
-        <header className="h-14 bg-slate-800/90 border-b border-slate-700/50 flex items-center justify-between px-4 shrink-0">
-          <div className="flex items-center gap-3">
-            <button onClick={() => setView('order')} className="p-2 text-slate-400 hover:text-white">
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <div>
-              <p className="text-sm font-bold text-white">{currentTable?.name} • Validée ✓</p>
-              <p className="text-[10px] text-emerald-400">Commande validée - Prête à encaisser</p>
-            </div>
-          </div>
-          <button onClick={() => dispatch({ type: 'LOGOUT' })} className="p-2 text-slate-400 hover:text-white">
-            <LogOut className="w-5 h-5" />
-          </button>
-        </header>
 
-        <div className="flex-1 flex flex-col items-center justify-center p-6">
-          <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="text-center">
-            <CheckCircle className="w-20 h-20 text-emerald-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-white mb-2">Commande Validée !</h2>
-            <p className="text-slate-400 mb-6">La commande a été validée et est prête à être encaissée</p>
-            
-            <div className="bg-slate-800/50 rounded-2xl p-6 mb-6 max-w-md">
-              <div className="flex justify-between items-center mb-4">
-                <span className="text-slate-400">Total</span>
-                <span className="text-3xl font-bold text-emerald-400">{currentTicket.totalAmount.toFixed(2)} €</span>
-              </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-slate-400">Articles</span>
-                <span className="text-white">{currentTicket.items.length}</span>
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <button onClick={() => setView('order')}
-                className="px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-medium">
-                Modifier
-              </button>
-              <button onClick={() => setShowPayment(true)}
-                className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-xl font-bold">
-                Encaisser
-              </button>
-            </div>
-          </motion.div>
-        </div>
-
-        {/* Payment Modal */}
-        {showPayment && <PaymentModal ticket={currentTicket} onClose={() => setShowPayment(false)} />}
-      </div>
-    );
-  }
 
   // View order (DRAFT)
   return (

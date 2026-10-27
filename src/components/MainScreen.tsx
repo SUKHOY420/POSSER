@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Clock, Users, DollarSign, LogOut, ChefHat, AlertCircle, CheckCircle2, Timer } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Clock, Users, DollarSign, LogOut, ChefHat, AlertCircle, CheckCircle2, Timer, Settings, Lock } from 'lucide-react';
 import { usePOS } from '../store';
 
 export default function MainScreen() {
   const { state, dispatch } = usePOS();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [filter, setFilter] = useState<'all' | 'occupied' | 'partial'>('all');
+  const [showAdminLogin, setShowAdminLogin] = useState(false);
+  const [adminPassword, setAdminPassword] = useState('');
+  const [passwordError, setPasswordError] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -22,6 +25,22 @@ export default function MainScreen() {
     if (filter === 'partial') return t.status === 'PARTIALLY_PAID';
     return true;
   });
+
+  const handleAdminLogin = () => {
+    const adminServer = state.servers.find(s => s.role === 'admin');
+    if (adminServer && adminPassword === adminServer.pin) {
+      setShowAdminLogin(false);
+      setAdminPassword('');
+      setPasswordError(false);
+      dispatch({ type: 'SET_SCREEN', payload: 'admin' });
+    } else {
+      setPasswordError(true);
+      setTimeout(() => {
+        setPasswordError(false);
+        setAdminPassword('');
+      }, 1500);
+    }
+  };
 
   return (
     <div className="h-screen flex flex-col gradient-dark">
@@ -55,6 +74,15 @@ export default function MainScreen() {
           <motion.button 
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
+            onClick={() => setShowAdminLogin(true)}
+            className="p-2 text-slate-400 hover:text-purple-400 touch-target transition-colors"
+            title="Accès administrateur"
+          >
+            <Settings className="w-5 h-5" />
+          </motion.button>
+          <motion.button 
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
             onClick={() => dispatch({ type: 'LOGOUT' })} 
             className="p-2 text-slate-400 hover:text-white touch-target"
           >
@@ -62,6 +90,80 @@ export default function MainScreen() {
           </motion.button>
         </div>
       </header>
+
+      {/* Admin Login Modal */}
+      <AnimatePresence>
+        {showAdminLogin && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => setShowAdminLogin(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="glass-card rounded-2xl p-6 w-full max-w-sm"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center mb-4">
+                  <Lock className="w-8 h-8 text-white" />
+                </div>
+                <h2 className="text-2xl font-bold text-white mb-2">Accès Administrateur</h2>
+                <p className="text-slate-400 text-sm">Entrez le mot de passe administrateur</p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <input
+                    type="password"
+                    value={adminPassword}
+                    onChange={e => setAdminPassword(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleAdminLogin()}
+                    placeholder="Mot de passe"
+                    className={`w-full px-4 py-3 glass rounded-xl text-white text-center text-lg font-mono tracking-wider focus:outline-none focus:ring-2 transition-all ${
+                      passwordError ? 'ring-2 ring-red-500' : 'focus:ring-purple-500'
+                    }`}
+                    autoFocus
+                  />
+                  {passwordError && (
+                    <motion.p
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="text-red-400 text-sm text-center mt-2"
+                    >
+                      Mot de passe incorrect
+                    </motion.p>
+                  )}
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      setShowAdminLogin(false);
+                      setAdminPassword('');
+                      setPasswordError(false);
+                    }}
+                    className="flex-1 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-medium transition-colors"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    onClick={handleAdminLogin}
+                    disabled={!adminPassword}
+                    className="flex-1 py-3 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 disabled:from-slate-600 disabled:to-slate-700 text-white rounded-xl font-bold transition-all"
+                  >
+                    Connexion
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Filtres */}
       <div className="px-4 py-3 border-b border-white/10 flex gap-2 shrink-0 overflow-x-auto scrollbar-hide">
