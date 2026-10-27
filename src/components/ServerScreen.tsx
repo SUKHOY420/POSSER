@@ -72,48 +72,70 @@ export default function ServerScreen() {
   // View tables
   if (view === 'tables' || !currentTicket) {
     return (
-      <div className="h-screen flex flex-col bg-slate-900">
-        <header className="h-14 bg-slate-800/90 border-b border-slate-700/50 flex items-center justify-between px-4 shrink-0">
+      <div className="h-screen flex flex-col gradient-dark">
+        <header className="h-16 glass border-b border-white/10 flex items-center justify-between px-4 shrink-0 shadow-lg">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold"
+            <motion.div 
+              whileHover={{ scale: 1.1 }}
+              className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-lg"
               style={{ backgroundColor: server?.color || '#64748b' }}>
               {server?.name[0] || '?'}
-            </div>
+            </motion.div>
             <div>
-              <p className="text-sm font-bold text-white">{server?.name || 'Serveur'}</p>
-              <p className="text-[10px] text-slate-400">Tablette de commande</p>
+              <p className="text-base font-bold text-white">{server?.name || 'Serveur'}</p>
+              <p className="text-xs text-slate-400">Tablette de commande</p>
             </div>
           </div>
-          <button onClick={() => dispatch({ type: 'LOGOUT' })} className="p-2 text-slate-400 hover:text-white">
+          <motion.button 
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => dispatch({ type: 'LOGOUT' })} 
+            className="p-2 text-slate-400 hover:text-white touch-target"
+          >
             <LogOut className="w-5 h-5" />
-          </button>
+          </motion.button>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-4">
-          <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-            <Grid3X3 className="w-5 h-5 text-blue-400" /> Sélectionnez une table
+        <div className="flex-1 overflow-y-auto p-4 container-responsive">
+          <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+            <Grid3X3 className="w-6 h-6 text-blue-400" /> Sélectionnez une table
           </h2>
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
-            {state.tables.map(table => {
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
+            {state.tables.map((table, index) => {
               const colors = getTableColors(table.status);
               return (
-                <motion.button key={table.id} whileTap={{ scale: 0.93 }}
+                <motion.button 
+                  key={table.id}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: index * 0.05 }}
+                  whileHover={{ scale: 1.05, y: -5 }}
+                  whileTap={{ scale: 0.95 }}
                   onClick={() => handleTableClick(table.id)}
-                  className={`aspect-square rounded-2xl border-2 bg-gradient-to-br ${colors.bg} ${colors.border} flex flex-col items-center justify-center gap-1 p-3 relative`}>
-                  <span className="text-xl font-bold text-white">{table.name}</span>
-                  <span className="text-xs text-slate-400">{table.seats}p</span>
+                  className={`aspect-square rounded-2xl border-2 ${colors.bg} flex flex-col items-center justify-center gap-2 p-3 relative hover-lift touch-target min-h-[120px]`}
+                >
+                  <span className="text-xl md:text-2xl font-bold text-white">{table.name}</span>
+                  <span className="text-xs text-slate-400">{table.seats} places</span>
                   {table.status !== 'FREE' && (
-                    <p className={`text-xs font-bold ${colors.text}`}>{table.totalToPay.toFixed(2)}€</p>
+                    <p className={`text-sm md:text-base font-bold ${colors.text}`}>{table.totalToPay.toFixed(2)}€</p>
                   )}
                   {table.totalPaid > 0 && table.totalPaid < table.totalToPay && (
-                    <div className="absolute top-1 left-1 px-1.5 py-0.5 bg-orange-500/80 rounded text-[9px] font-bold text-white">
+                    <motion.div 
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      className="absolute top-2 left-2 px-2 py-1 gradient-warning rounded-lg text-[10px] font-bold text-white shadow-lg"
+                    >
                       PARTIEL
-                    </div>
+                    </motion.div>
                   )}
                   {table.totalPaid >= table.totalToPay && table.totalToPay > 0 && (
-                    <div className="absolute top-1 left-1 px-1.5 py-0.5 bg-green-500/80 rounded text-[9px] font-bold text-white">
+                    <motion.div 
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      className="absolute top-2 left-2 px-2 py-1 gradient-success rounded-lg text-[10px] font-bold text-white shadow-lg"
+                    >
                       PAYÉ
-                    </div>
+                    </motion.div>
                   )}
                 </motion.button>
               );
@@ -181,52 +203,80 @@ export default function ServerScreen() {
 
   // View order (DRAFT)
   return (
-    <div className="h-screen flex flex-col md:flex-row bg-slate-900">
+    <div className="h-screen flex flex-col md:flex-row gradient-dark">
       {/* Menu */}
-      <div className="flex-1 flex flex-col h-[55vh] md:h-full border-r border-slate-700/50">
-        <div className="p-3 border-b border-slate-700/50 shrink-0">
-          <div className="flex items-center justify-between mb-2">
-            <button onClick={() => setView('tables')} className="flex items-center gap-1 text-slate-400 hover:text-white text-sm">
+      <div className="flex-1 flex flex-col h-[55vh] md:h-full border-r border-white/10">
+        <div className="p-3 md:p-4 border-b border-white/10 glass shrink-0">
+          <div className="flex items-center justify-between mb-3">
+            <motion.button 
+              whileHover={{ x: -3 }}
+              onClick={() => setView('tables')} 
+              className="flex items-center gap-1 text-slate-400 hover:text-white text-sm touch-target"
+            >
               <ArrowLeft className="w-4 h-4" /> Tables
-            </button>
+            </motion.button>
             <div className="text-right">
-              <span className="text-lg font-bold text-white">{currentTable?.name}</span>
+              <span className="text-lg md:text-xl font-bold text-white">{currentTable?.name}</span>
               {currentTicket?.status === 'DRAFT' && (
-                <span className="ml-2 px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded-full text-xs">Brouillon</span>
+                <motion.span 
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  className="ml-2 px-2 py-1 gradient-warning text-white rounded-full text-xs font-bold shadow-lg"
+                >
+                  Brouillon
+                </motion.span>
               )}
             </div>
           </div>
-          <div className="relative mb-2">
+          <div className="relative mb-3">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input type="text" placeholder="Rechercher..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-slate-400 text-sm focus:outline-none" />
+              className="w-full pl-9 pr-4 py-2.5 input-modern text-sm" />
           </div>
-          <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
-            <button onClick={() => setActiveCategory('Tous')}
-              className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${activeCategory === 'Tous' ? 'bg-white text-slate-900' : 'bg-slate-700/50 text-slate-300'}`}>
+          <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+            <motion.button 
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setActiveCategory('Tous')}
+              className={`px-4 py-2 rounded-xl text-xs font-medium whitespace-nowrap touch-target ${
+                activeCategory === 'Tous' ? 'gradient-primary text-white shadow-lg' : 'glass text-slate-300 hover:bg-white/10'
+              }`}
+            >
               Tous
-            </button>
+            </motion.button>
             {categories.map(cat => (
-              <button key={cat.name} onClick={() => setActiveCategory(cat.name)}
-                className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap flex items-center gap-1 ${
-                  activeCategory === cat.name ? 'text-white' : 'bg-slate-700/50 text-slate-300'
+              <motion.button 
+                key={cat.name}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setActiveCategory(cat.name)}
+                className={`px-4 py-2 rounded-xl text-xs font-medium whitespace-nowrap flex items-center gap-1 touch-target ${
+                  activeCategory === cat.name ? 'text-white shadow-lg' : 'glass text-slate-300 hover:bg-white/10'
                 }`}
-                style={activeCategory === cat.name ? { backgroundColor: cat.color } : {}}>
-                {cat.emoji} {cat.name}
-              </button>
+                style={activeCategory === cat.name ? { backgroundColor: cat.color } : {}}
+              >
+                <span className="text-sm">{cat.emoji}</span> {cat.name}
+              </motion.button>
             ))}
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-3">
-          <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
-            {filteredItems.map(item => (
-              <motion.button key={item.id} whileTap={{ scale: 0.9 }}
+        <div className="flex-1 overflow-y-auto p-3 md:p-4">
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 md:gap-3">
+            {filteredItems.map((item, index) => (
+              <motion.button 
+                key={item.id}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: index * 0.02 }}
+                whileHover={{ scale: 1.05, y: -3 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={() => handleAddItem(item)}
-                className="bg-slate-800/80 border border-slate-700/50 rounded-xl p-2 flex flex-col items-center justify-center gap-1 hover:border-slate-500/50">
-                <span className="text-2xl">{item.emoji}</span>
-                <span className="text-[10px] text-white font-medium text-center leading-tight">{item.name}</span>
-                <span className="text-xs font-bold" style={{ color: item.color }}>{item.price.toFixed(2)}€</span>
+                className="glass-card rounded-xl p-3 flex flex-col items-center justify-center gap-2 hover-lift touch-target min-h-[100px]"
+              >
+                <span className="text-3xl md:text-4xl">{item.emoji}</span>
+                <span className="text-xs text-white font-medium text-center leading-tight">{item.name}</span>
+                <span className="text-sm font-bold" style={{ color: item.color }}>{item.price.toFixed(2)}€</span>
               </motion.button>
             ))}
           </div>
@@ -234,104 +284,158 @@ export default function ServerScreen() {
       </div>
 
       {/* Current Order */}
-      <div className="flex-1 flex flex-col h-[45vh] md:h-full bg-slate-800/30">
-        <div className="p-3 border-b border-slate-700/50 flex items-center justify-between shrink-0">
+      <div className="flex-1 flex flex-col h-[45vh] md:h-full glass-light">
+        <div className="p-3 md:p-4 border-b border-white/10 glass flex items-center justify-between shrink-0">
           <div>
-            <h2 className="text-base font-bold text-white">Commande • {currentTable?.name}</h2>
+            <h2 className="text-base md:text-lg font-bold text-white">Commande • {currentTable?.name}</h2>
             <p className="text-xs text-slate-400">{server?.name}</p>
           </div>
           {currentTicket?.status === 'DRAFT' && currentTicket.items.length > 0 && (
-            <button onClick={handleValidate}
-              className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold text-sm flex items-center gap-2">
+            <motion.button 
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleValidate}
+              className="btn-success text-sm flex items-center gap-2 touch-target"
+            >
               <CheckCircle className="w-4 h-4" />
               Valider
-            </button>
+            </motion.button>
           )}
           {currentTicket?.status === 'OPEN' && (
-            <button onClick={handleSendToKitchen}
-              className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-bold text-sm flex items-center gap-2">
+            <motion.button 
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleSendToKitchen}
+              className="btn-primary text-sm flex items-center gap-2 touch-target"
+            >
               <Send className="w-4 h-4" />
               Cuisine
-            </button>
+            </motion.button>
           )}
         </div>
 
-        <div className="flex-1 overflow-y-auto p-3 space-y-2">
+        <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-2">
           {currentTicket?.items.length === 0 ? (
-            <div className="text-center py-8 text-slate-500">
-              <p className="text-3xl mb-2">🍽️</p>
-              <p className="text-sm">Ajoutez des articles</p>
+            <div className="text-center py-12 text-slate-500">
+              <motion.div
+                animate={{ y: [0, -10, 0] }}
+                transition={{ duration: 2, repeat: Infinity }}
+                className="text-5xl mb-3"
+              >
+                🍽️
+              </motion.div>
+              <p className="text-base">Ajoutez des articles</p>
             </div>
           ) : (
-            currentTicket?.items.map(item => (
-              <div key={item.id} className="bg-slate-700/30 rounded-xl p-3 border border-slate-600/30">
+            currentTicket?.items.map((item, index) => (
+              <motion.div 
+                key={item.id}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.05 }}
+                className="glass-card rounded-xl p-3 md:p-4"
+              >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <span>{item.menuItem.emoji}</span>
-                      <span className="text-sm font-medium text-white">{item.menuItem.name}</span>
+                      <span className="text-2xl">{item.menuItem.emoji}</span>
+                      <span className="text-sm md:text-base font-medium text-white">{item.menuItem.name}</span>
                       {item.status === 'validated' && (
-                        <CheckCircle className="w-3 h-3 text-emerald-400" />
+                        <motion.div
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                        >
+                          <CheckCircle className="w-4 h-4 text-emerald-400" />
+                        </motion.div>
                       )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="flex items-center bg-slate-600/50 rounded-lg">
-                      <button onClick={() => {
-                        if (item.quantity <= 1) dispatch({ type: 'REMOVE_ITEM', payload: { ticketId: state.currentTicketId!, itemId: item.id } });
-                        else dispatch({ type: 'UPDATE_QTY', payload: { ticketId: state.currentTicketId!, itemId: item.id, qty: item.quantity - 1 } });
-                      }} className="p-1.5 hover:bg-slate-500/50 rounded-l-lg">
-                        <Minus className="w-3 h-3 text-white" />
-                      </button>
-                      <span className="text-sm font-bold text-white w-5 text-center">{item.quantity}</span>
-                      <button onClick={() => dispatch({ type: 'UPDATE_QTY', payload: { ticketId: state.currentTicketId!, itemId: item.id, qty: item.quantity + 1 } })}
-                        className="p-1.5 hover:bg-slate-500/50 rounded-r-lg">
-                        <Plus className="w-3 h-3 text-white" />
-                      </button>
+                    <div className="flex items-center glass rounded-lg">
+                      <motion.button 
+                        whileTap={{ scale: 0.9 }}
+                        onClick={() => {
+                          if (item.quantity <= 1) dispatch({ type: 'REMOVE_ITEM', payload: { ticketId: state.currentTicketId!, itemId: item.id } });
+                          else dispatch({ type: 'UPDATE_QTY', payload: { ticketId: state.currentTicketId!, itemId: item.id, qty: item.quantity - 1 } });
+                        }} 
+                        className="p-2 hover:bg-white/10 rounded-l-lg touch-target"
+                      >
+                        <Minus className="w-4 h-4 text-white" />
+                      </motion.button>
+                      <span className="text-base font-bold text-white w-8 text-center">{item.quantity}</span>
+                      <motion.button 
+                        whileTap={{ scale: 0.9 }}
+                        onClick={() => dispatch({ type: 'UPDATE_QTY', payload: { ticketId: state.currentTicketId!, itemId: item.id, qty: item.quantity + 1 } })}
+                        className="p-2 hover:bg-white/10 rounded-r-lg touch-target"
+                      >
+                        <Plus className="w-4 h-4 text-white" />
+                      </motion.button>
                     </div>
-                    <span className="text-sm font-bold text-white min-w-[45px] text-right">
+                    <span className="text-base font-bold text-white min-w-[50px] text-right">
                       {(item.menuItem.price * item.quantity).toFixed(2)}€
                     </span>
                   </div>
                 </div>
-              </div>
+              </motion.div>
             ))
           )}
         </div>
 
         {/* Total */}
-        <div className="p-3 border-t border-slate-700/50 bg-slate-800/50 shrink-0">
-          <div className="flex justify-between items-center mb-1">
-            <span className="text-slate-400 text-sm">Total</span>
-            <span className="text-xl font-bold text-emerald-400">{currentTicket?.totalAmount.toFixed(2)} €</span>
+        <div className="p-3 md:p-4 border-t border-white/10 glass shrink-0">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-slate-400 text-sm md:text-base">Total</span>
+            <motion.span 
+              key={currentTicket?.totalAmount}
+              initial={{ scale: 1.2 }}
+              animate={{ scale: 1 }}
+              className="text-2xl md:text-3xl font-bold text-emerald-400"
+            >
+              {currentTicket?.totalAmount.toFixed(2)} €
+            </motion.span>
           </div>
           {totalPaid > 0 && (
-            <>
-              <div className="flex justify-between items-center mb-1 text-xs">
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              className="space-y-1 mb-3"
+            >
+              <div className="flex justify-between items-center text-xs md:text-sm">
                 <span className="text-slate-400">Payé</span>
-                <span className="text-green-400">{totalPaid.toFixed(2)} €</span>
+                <span className="text-green-400 font-bold">{totalPaid.toFixed(2)} €</span>
               </div>
               {remaining > 0 && (
-                <div className="flex justify-between items-center mb-1 text-xs">
+                <div className="flex justify-between items-center text-xs md:text-sm">
                   <span className="text-slate-400">Reste</span>
-                  <span className="text-orange-400">{remaining.toFixed(2)} €</span>
+                  <span className="text-orange-400 font-bold">{remaining.toFixed(2)} €</span>
                 </div>
               )}
-            </>
+            </motion.div>
           )}
           {currentTicket?.status === 'OPEN' && (
-            <button onClick={() => setShowPayment(true)}
-              className="w-full py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl font-bold active:scale-[0.98] transition-all">
+            <motion.button 
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setShowPayment(true)}
+              className="w-full py-3 md:py-4 btn-success text-base md:text-lg touch-target"
+            >
               {totalPaid > 0 ? 'Paiement partiel' : 'Encaisser'}
-            </button>
+            </motion.button>
           )}
           {remaining <= 0 && totalPaid > 0 && (
-            <button onClick={() => {
-              dispatch({ type: 'CLOSE_TICKET', payload: state.currentTicketId! });
-              setView('tables');
-            }} className="w-full py-2 mt-2 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold text-sm">
+            <motion.button 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => {
+                dispatch({ type: 'CLOSE_TICKET', payload: state.currentTicketId! });
+                setView('tables');
+              }} 
+              className="w-full py-3 mt-2 btn-success text-sm md:text-base touch-target"
+            >
               ✓ Fermer la table (tout payé)
-            </button>
+            </motion.button>
           )}
         </div>
       </div>
