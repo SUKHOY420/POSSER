@@ -1,6 +1,5 @@
 // ============================================
-// MODÈLE DE DONNÉES PROFESSIONNEL POS
-// Architecture : Tables → Tickets → Items + Payments
+// TYPES - Architecture Ticket-based avec Admin
 // ============================================
 
 export interface MenuItem {
@@ -11,30 +10,7 @@ export interface MenuItem {
   color: string;
   emoji: string;
   isFood: boolean;
-  modifiers?: Modifier[];
-}
-
-export interface Modifier {
-  id: string;
-  name: string;
-  options: string[];
-  required: boolean;
-}
-
-// TICKET = Une addition. Une table peut avoir plusieurs tickets (paiements séparés)
-export interface Ticket {
-  id: string;
-  tableId: string;
-  items: TicketItem[];
-  status: 'OPEN' | 'PAID' | 'CANCELLED';
-  totalAmount: number;
-  paidAmount: number;
-  createdAt: Date;
-  closedAt?: Date;
-  serverId: string;
-  serverName: string;
-  payments: Payment[];
-  discount: number;
+  modifiers?: { id: string; name: string; options: string[]; required: boolean }[];
 }
 
 export interface TicketItem {
@@ -43,9 +19,9 @@ export interface TicketItem {
   quantity: number;
   notes: string;
   modifiers: Record<string, string>;
-  status: 'pending' | 'sent' | 'preparing' | 'ready' | 'served';
+  status: 'pending' | 'validated' | 'sent' | 'preparing' | 'ready' | 'served';
+  validatedAt?: Date;
   sentAt?: Date;
-  readyAt?: Date;
 }
 
 export interface Payment {
@@ -57,13 +33,30 @@ export interface Payment {
   timestamp: Date;
 }
 
-// TABLE avec machine à états
+export interface Ticket {
+  id: string;
+  tableId: string;
+  items: TicketItem[];
+  status: 'DRAFT' | 'OPEN' | 'PAID' | 'CANCELLED';
+  totalAmount: number;
+  paidAmount: number;
+  createdAt: Date;
+  validatedAt?: Date;
+  closedAt?: Date;
+  serverId: string;
+  serverName: string;
+  payments: Payment[];
+  discount: number;
+}
+
+export type TableStatus = 'FREE' | 'OCCUPIED' | 'PARTIALLY_PAID' | 'RESERVED' | 'CLEANING';
+
 export interface Table {
   id: string;
   name: string;
   seats: number;
-  status: 'FREE' | 'OCCUPIED' | 'PARTIALLY_PAID' | 'RESERVED' | 'CLEANING';
-  ticketIds: string[]; // Une table peut avoir plusieurs tickets
+  status: TableStatus;
+  ticketIds: string[];
   totalToPay: number;
   totalPaid: number;
 }
@@ -72,37 +65,33 @@ export interface Server {
   id: string;
   name: string;
   pin: string;
-  role: 'admin' | 'server' | 'kitchen';
   color: string;
-  isActive: boolean;
+  role: 'admin' | 'server';
 }
 
-export interface Category {
-  id: string;
-  name: string;
-  emoji: string;
-  color: string;
+export type ScreenType = 'select' | 'main' | 'kitchen' | 'server' | 'admin';
+
+export interface TicketFormat {
+  showLogo: boolean;
+  showAddress: boolean;
+  showPhone: boolean;
+  showServer: boolean;
+  showDate: boolean;
+  showItems: boolean;
+  showTotal: boolean;
+  showPayment: boolean;
+  showFooter: boolean;
+  footerText: string;
 }
 
-export type ScreenType = 'select' | 'main' | 'kitchen' | 'server' | 'close' | 'hardware';
-
-export interface Session {
-  id: string;
-  date: Date;
-  openedAt: Date;
-  closedAt?: Date;
-  totalRevenue: number;
-  totalCash: number;
-  totalCard: number;
-  totalOrders: number;
-  serverTotals: Record<string, { name: string; orders: number; revenue: number; cash: number; card: number }>;
-}
-
-// Queue d'actions pour gestion hors-ligne (Optimistic UI)
-export interface PendingAction {
-  id: string;
-  type: string;
-  payload: any;
-  timestamp: Date;
-  retryCount: number;
+export interface AppState {
+  screen: ScreenType;
+  tables: Table[];
+  tickets: Ticket[];
+  servers: Server[];
+  menuItems: MenuItem[];
+  currentServer: Server | null;
+  currentTicketId: string | null;
+  cashBalance: number;
+  ticketFormat: TicketFormat;
 }

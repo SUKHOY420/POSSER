@@ -1,171 +1,244 @@
-# QuickPOS - Système de Caisse Multi-Postes
+# QuickPOS Pro - Système de Caisse Professionnel
 
-## 🎯 Architecture Multi-Postes
+Système de caisse multi-postes avec synchronisation temps réel, validation de commande et panneau d'administration complet.
 
-QuickPOS est un système de caisse professionnel avec **synchronisation en temps réel** entre tous les postes :
+## 🚀 Fonctionnalités Principales
 
-### Postes disponibles :
+### 1. **Workflow de Validation de Commande**
+Le serveur suit un workflow en 3 étapes :
+1. **DRAFT** : Prendre la commande (brouillon)
+2. **VALIDATE** : Valider la commande (confirmation)
+3. **OPEN** : Encaisser et envoyer en cuisine
 
-1. **🖥️ Écran Principal (Caisse)**
-   - Vue globale de toutes les commandes
-   - Suivi en temps réel de l'activité
-   - Statistiques et CA du jour
+### 2. **Multi-Postes Synchronisés**
+- **Caisse Principale** : Vue globale de toutes les tables en temps réel
+- **Écran Cuisine (KDS)** : Affichage des commandes à préparer
+- **Tablettes Serveurs** : Prise de commande avec validation
+- **Administration** : Gestion complète du système
 
-2. **👨‍🍳 Écran Cuisine (KDS)**
-   - Affiche uniquement les commandes de nourriture
-   - Workflow : Reçue → En préparation → Prête
-   - Alertes sonores et visuelles pour les nouvelles commandes
+### 3. **Paiements Partiels**
+- Paiement par articles sélectionnés
+- Paiement par montant personnalisé
+- Indicateurs visuels : 🔴 Occupée, 🟠 Partiel, 🟢 Payé
+- Synchronisation instantanée entre tous les postes
 
-3. **📱 Tablettes Serveurs** (plusieurs possibles)
-   - Chaque serveur a son propre espace
-   - Prise de commandes et encaissement
-   - Envoi automatique en cuisine
+### 4. **Panneau d'Administration**
+- **Produits** : Ajouter, modifier, supprimer des articles
+- **Tables** : Gérer le plan de salle
+- **Serveurs** : Gérer les comptes et PIN
+- **Tickets** : Voir l'historique des commandes
+- **Format** : Personnaliser le format des tickets
+- **Rapports** : Statistiques avec filtres (jour, semaine, mois, serveur, table)
 
-## 🔄 Synchronisation en Temps Réel
+## 📋 Utilisation
 
-### Comment tester la synchronisation :
-
-1. **Ouvrez l'application dans votre navigateur**
-2. **Ouvrez-la à nouveau dans un NOUVEL onglet ou une nouvelle fenêtre**
-   - Ctrl+T (nouvel onglet) ou Ctrl+N (nouvelle fenêtre)
-   - Ou cliquez droit → "Ouvrir dans un nouvel onglet"
-3. **Dans chaque onglet/fenêtre, choisissez un poste différent** :
-   - Onglet 1 : Écran Principal (Caisse)
-   - Onglet 2 : Écran Cuisine
-   - Onglet 3+ : Tablette Serveur (plusieurs serveurs)
-
-### Ce qui est synchronisé :
-
-✅ **Commandes** : Création, modification, fermeture  
-✅ **Articles** : Ajout, suppression, quantités, notes  
-✅ **Statuts cuisine** : En préparation, Prêt, Servi  
-✅ **Tables** : Occupation, libération  
-✅ **Paiements** : Espèces, carte  
-✅ **Notifications** : Alertes en temps réel  
-
-### Indicateurs visuels :
-
-- **🔵 Indicateur de sync** (en haut à gauche) : Montre le type de poste et la dernière synchronisation
-- **🔔 Notifications** (en haut à droite) : Alertes en temps réel
-- **🔊 Son cuisine** : Alertes sonores quand une nouvelle commande arrive
-
-## 🖨️ Imprimante Thermique (ESC/POS)
-
-### Configuration :
-- Allez dans **Paramètres → Configuration Périphériques**
-- Choisissez le type de connexion : USB, Série, Bluetooth, Réseau
-- Configurez l'adresse (IP/MAC/Port)
-- Options : coupe automatique, ouverture tiroir-caisse
-
-### Impression automatique :
-- **Ticket client** : À l'encaissement
-- **Ticket cuisine** : À l'envoi en cuisine
-- **Rapport Z** : À la clôture de session
-
-## 💳 Terminal de Paiement (TPE)
-
-### Fournisseurs supportés :
-- **Ingenico** (protocole EPAS)
-- **Verifone** (protocole VIP)
-- **SumUp** (Bluetooth/API)
-- **Stripe Terminal** (SDK Cloud)
-- **Simulateur** (mode démo)
-
-### Configuration :
-- Allez dans **Paramètres → Configuration Périphériques → Terminal Paiement**
-- Choisissez votre fournisseur
-- Configurez la connexion et les clés API
-
-### Flux de paiement :
-1. Serveur clique sur "Encaisser"
-2. Choix : Espèces ou Carte
-3. Si Carte : Communication avec le TPE
-4. Affichage de la progression
-5. Impression automatique du ticket
-6. Synchronisation avec tous les postes
-
-## 📊 Clôture de Session
-
-### Rapport Z automatique :
-- Total général de la journée
-- Détail par serveur (commandes, CA, espèces, CB)
-- Comptage caisse (attendu vs réel)
-- Écart de caisse
-- Impression du rapport Z
-
-### Nouvelle session :
-- Toutes les données sont réinitialisées
-- Prêt pour le lendemain
-
-## 🎨 Fonctionnalités
-
-### Pour les serveurs :
-- ✅ Plan de tables interactif
-- ✅ Menu avec catégories et recherche
-- ✅ Modificateurs (cuisson, sauces...)
-- ✅ Notes cuisine (allergies, préférences)
-- ✅ Remises (%)
-- ✅ Encaissement espèces/carte
-- ✅ Impression tickets
-
-### Pour la cuisine :
-- ✅ Affichage des commandes food uniquement
-- ✅ Tri par ancienneté
-- ✅ Alertes urgentes (+15 min)
-- ✅ Workflow visuel (reçue → préparation → prêt)
-- ✅ Bouton "Tout prêt"
-- ✅ Notifications sonores
-
-### Pour la caisse :
-- ✅ Vue globale de toutes les commandes
-- ✅ Filtres par statut
-- ✅ Statistiques en temps réel
-- ✅ Suivi du CA
-- ✅ Indicateurs périphériques
-
-## 🔧 Technologies
-
-- **React 18** + TypeScript
-- **Tailwind CSS** (responsive)
-- **Framer Motion** (animations)
-- **BroadcastChannel API** (sync cross-tab)
-- **WebUSB/WebSerial/WebBluetooth** (périphériques)
-- **ESC/POS** (protocole imprimante)
-
-## 🚀 Démarrage
-
+### Démarrage
 ```bash
-# Installation
 npm install
-
-# Développement
 npm run dev
-
-# Build production
-npm run build
 ```
 
-## 📱 Responsive
+### Ouvrir plusieurs postes
+Ouvrez l'application dans **plusieurs onglets** du même navigateur :
+- Onglet 1 : Caisse Principale
+- Onglet 2 : Écran Cuisine
+- Onglet 3+ : Tablettes Serveurs
+
+La synchronisation se fait automatiquement via BroadcastChannel API.
+
+### Comptes de test
+- **Admin** : PIN `0000`
+- **Marie** : PIN `1234`
+- **Thomas** : PIN `2345`
+- **Julie** : PIN `3456`
+- **Karim** : PIN `4567`
+
+## 🔄 Workflow Serveur
+
+### 1. Sélectionner une table
+- Les tables sont codées par couleur :
+  - 🟢 **Vert** : Libre
+  - 🔴 **Rouge** : Occupée
+  - 🟠 **Orange** : Paiement partiel
+  - 🔵 **Bleu** : Réservée
+
+### 2. Prendre la commande (DRAFT)
+- Ajouter des articles depuis le menu
+- Modifier les quantités
+- La commande est en mode **brouillon**
+
+### 3. Valider la commande
+- Cliquer sur le bouton **"Valider"**
+- La commande passe en statut **OPEN**
+- Un écran de confirmation s'affiche
+
+### 4. Envoyer en cuisine
+- Cliquer sur **"Cuisine"** pour envoyer les plats
+- La cuisine reçoit la commande instantanément
+
+### 5. Encaisser
+- Cliquer sur **"Encaisser"**
+- Sélectionner les articles à payer ou entrer un montant
+- Choisir le mode de paiement (Espèces/Carte)
+- Possibilité de paiement partiel
+
+### 6. Fermer la table
+- Quand tout est payé, cliquer sur **"Fermer la table"**
+- La table redevient libre
+
+## 🍳 Écran Cuisine (KDS)
+
+- Affiche uniquement les plats (pas les boissons)
+- Workflow : **Reçue** → **En préparation** → **Prête**
+- Alertes sonores pour les nouvelles commandes
+- Indicateur de temps écoulé
+- Bouton "Tout prêt" pour valider tous les plats d'une commande
+
+## 💰 Paiements Partiels
+
+### Scénario : Table de 3 personnes
+1. Commande totale : 60€
+2. Personne 1 paie 20€ (sélectionner ses articles)
+3. Table passe en 🟠 **PARTIEL**
+4. Personne 2 paie 25€
+5. Personne 3 paie 15€
+6. Table passe en 🟢 **PAYÉ**
+7. Fermer la table
+
+### Indicateurs visuels
+- **Badge "PARTIEL"** : Orange sur la table
+- **Badge "PAYÉ"** : Vert sur la table
+- **Montant payé** : Affiché en vert
+- **Reste à payer** : Affiché en orange
+
+## 🛠️ Administration
+
+### Gestion des Produits
+- Nom, prix, emoji, catégorie
+- Type : Nourriture ou Boisson
+- Couleur personnalisée
+
+### Gestion des Tables
+- Nom et nombre de places
+- Statut automatique basé sur les tickets
+
+### Gestion des Serveurs
+- Nom, PIN, couleur
+- Rôle : Admin ou Serveur
+
+### Format des Tickets
+Personnalisez ce qui apparaît sur le ticket :
+- Logo, adresse, téléphone
+- Nom du serveur, date
+- Articles, total, paiement
+- Texte de footer personnalisé
+
+### Rapports
+Filtres disponibles :
+- **Période** : Aujourd'hui, semaine, mois, tout
+- **Serveur** : Tous ou serveur spécifique
+- **Table** : Toutes ou table spécifique
+
+Statistiques affichées :
+- Chiffre d'affaires
+- Nombre de tickets
+- Panier moyen
+- Répartition espèces/carte
+
+**Export CSV** : Télécharger les données filtrées
+
+## 🏗️ Architecture Technique
+
+### State Management
+- **React Context + useReducer** : Gestion d'état centralisée
+- **Actions typées** : Toutes les actions sont typées TypeScript
+- **Machine à états** : `recalculateTableStatus()` calcule automatiquement le statut des tables
+
+### Synchronisation Temps Réel
+- **BroadcastChannel API** : Communication entre onglets
+- **Événements** : TICKET_UPDATE, TABLE_UPDATE, KITCHEN_NOTIFY
+- **Optimistic UI** : Mise à jour immédiate de l'interface
+
+### Modèle de Données
+```typescript
+Table {
+  id, name, seats, status
+  ticketIds[] // Une table peut avoir plusieurs tickets
+  totalToPay, totalPaid
+}
+
+Ticket {
+  id, tableId, items[]
+  status: 'DRAFT' | 'OPEN' | 'PAID' | 'CANCELLED'
+  totalAmount, paidAmount
+  payments[]
+  serverId, serverName
+}
+
+TicketItem {
+  id, menuItem, quantity, notes
+  status: 'pending' | 'validated' | 'sent' | 'preparing' | 'ready' | 'served'
+}
+```
+
+### Codes Couleurs Universels
+- 🟢 **Vert** : Libre / Payé
+- 🔴 **Rouge** : Occupée / Non payé
+- 🟠 **Orange** : Paiement partiel
+- 🔵 **Bleu** : Réservée / En cours
+- 🟣 **Violet** : Administration
+
+## 📱 Responsive Design
 
 L'application s'adapte automatiquement :
-- **Mobile** : Navigation bottom bar
-- **Tablette** : Interface tactile optimisée
-- **Desktop** : Sidebar + vue complète
+- **Mobile** : Navigation simplifiée, boutons tactiles larges
+- **Tablette** : Interface optimale pour les serveurs
+- **Desktop** : Vue complète pour la caisse et l'administration
 
 ## 🔒 Sécurité
 
-- Codes PIN pour les serveurs
-- Rôles : Admin, Serveur, Cuisine
-- Inaltérabilité des données (commandes fermées non modifiables)
-- Conformité NF525 (prévu)
+- **PIN requis** pour accéder aux postes serveur et admin
+- **Validation de commande** : Évite les erreurs de saisie
+- **Inaltérabilité** : Les tickets payés ne peuvent pas être modifiés
+- **Traçabilité** : Tous les paiements sont enregistrés
 
-## 📝 Notes
+## 🎯 Cas d'Usage
 
-- La synchronisation fonctionne entre onglets/fenêtres du **même navigateur**
-- Pour une utilisation multi-appareils, il faudrait un backend (WebSocket/Firebase)
-- Les périphériques (imprimante/TPE) nécessitent les API navigateur (Chrome/Edge)
-- Mode démo disponible pour tester sans matériel
+### Restaurant
+- Serveurs avec tablettes
+- Cuisine avec écran KDS
+- Caisse principale pour le manager
+- Paiements partiels pour les groupes
+
+### Bar
+- Commandes rapides au bar
+- Encaissement immédiat
+- Gestion des ardoises
+
+### Café
+- Commandes à table
+- Addition séparée possible
+- Rapports par serveur
+
+## 🚧 Fonctionnalités Futures
+
+- [ ] Intégration imprimante thermique (ESC/POS)
+- [ ] Intégration TPE (Terminal de Paiement)
+- [ ] Backend avec base de données (PostgreSQL)
+- [ ] WebSockets pour synchronisation multi-appareils
+- [ ] Gestion des stocks
+- [ ] Programme de fidélité
+- [ ] Commandes en ligne (QR Code)
+- [ ] Intégration UberEats/Deliveroo
+
+## 📄 Licence
+
+MIT License - Libre d'utilisation et de modification
+
+## 🤝 Contribution
+
+Les contributions sont les bienvenues ! N'hésitez pas à ouvrir une issue ou une pull request.
 
 ---
 
-**QuickPOS** - Système de caisse professionnel, agile et moderne 🚀
+**QuickPOS Pro** - Système de caisse professionnel, agile et moderne 🚀
