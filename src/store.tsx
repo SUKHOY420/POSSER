@@ -1,267 +1,358 @@
 import React, { createContext, useContext, useReducer, ReactNode } from 'react';
-import { Order, OrderItem, Table, Payment, ViewMode, MenuItem } from './types';
-import { initialTables } from './data';
+import { Order, OrderItem, Table, Payment, ScreenType, Server, Session } from './types';
+import { initialTables, servers } from './data';
 import { v4 as uuidv4 } from 'uuid';
 
 interface State {
+  screen: ScreenType;
   tables: Table[];
   orders: Order[];
-  currentView: ViewMode;
-  selectedTableId: string | null;
-  currentOrder: Order | null;
-  server: string;
+  servers: Server[];
+  currentServer: Server | null;
+  currentOrderId: string | null;
+  currentTableId: string | null;
   cashBalance: number;
-  dailyRevenue: number;
+  session: Session;
+  closedSessions: Session[];
 }
 
 type Action =
-  | { type: 'SET_VIEW'; payload: ViewMode }
-  | { type: 'SELECT_TABLE'; payload: string }
+  | { type: 'SET_SCREEN'; payload: ScreenType }
+  | { type: 'LOGIN_SERVER'; payload: Server }
+  | { type: 'LOGOUT_SERVER' }
   | { type: 'OPEN_TABLE'; payload: string }
-  | { type: 'ADD_ITEM_TO_ORDER'; payload: { menuItem: MenuItem; notes?: string; modifiers?: Record<string, string> } }
-  | { type: 'REMOVE_ITEM_FROM_ORDER'; payload: string }
-  | { type: 'UPDATE_ITEM_QUANTITY'; payload: { itemId: string; quantity: number } }
-  | { type: 'UPDATE_ITEM_NOTES'; payload: { itemId: string; notes: string } }
-  | { type: 'SEND_ORDER_TO_KITCHEN' }
-  | { type: 'PROCESS_PAYMENT'; payload: { method: Payment['method']; amount: number } }
-  | { type: 'CLOSE_ORDER' }
-  | { type: 'APPLY_DISCOUNT'; payload: number }
-  | { type: 'TRANSFER_TABLE'; payload: { fromTableId: string; toTableId: string } }
+  | { type: 'ADD_ITEM'; payload: { orderId: string; item: OrderItem } }
+  | { type: 'REMOVE_ITEM'; payload: { orderId: string; itemId: string } }
+  | { type: 'UPDATE_QTY'; payload: { orderId: string; itemId: string; qty: number } }
+  | { type: 'UPDATE_NOTES'; payload: { orderId: string; itemId: string; notes: string } }
+  | { type: 'SEND_TO_KITCHEN'; payload: string }
+  | { type: 'MARK_PREPARING'; payload: { orderId: string; itemId: string } }
+  | { type: 'MARK_READY'; payload: { orderId: string; itemId: string } }
+  | { type: 'MARK_SERVED'; payload: { orderId: string; itemId: string } }
+  | { type: 'APPLY_DISCOUNT'; payload: { orderId: string; discount: number } }
+  | { type: 'PROCESS_PAYMENT'; payload: { orderId: string; method: 'cash' | 'card'; amount: number } }
+  | { type: 'CLOSE_ORDER'; payload: string }
   | { type: 'SET_TABLE_STATUS'; payload: { tableId: string; status: Table['status'] } }
-  | { type: 'CLEAR_TABLE'; payload: string };
+  | { type: 'TRANSFER_TABLE'; payload: { fromId: string; toId: string } }
+  | { type: 'CLOSE_SESSION' };
+
+function createSession(): Session {
+  return {
+    id: uuidv4(),
+    date: new Date(),
+    openedAt: new Date(),
+    totalRevenue: 0,
+    totalCash: 0,
+    totalCard: 0,
+    totalOrders: 0,
+    serverTotals: {},
+  };
+}
 
 const initialState: State = {
+  screen: 'select',
   tables: initialTables,
   orders: [],
-  currentView: 'dashboard',
-  selectedTableId: null,
-  currentOrder: null,
-  server: 'Marie',
+  servers: servers,
+  currentServer: null,
+  currentOrderId: null,
+  currentTableId: null,
   cashBalance: 200,
-  dailyRevenue: 0,
+  session: createSession(),
+  closedSessions: [],
 };
+
+function calcSubtotal(items: OrderItem[]): number {
+  return items.reduce((sum, i) => sum + i.menuItem.price * i.quantity, 0);
+}
+
+function calcTotal(subtotal: number, discount: number): number {
+  return subtotal * (1 - discount / 100);
+}
+
+function updateSessionFromOrder(session: Session, order: Order): Session {
+  const newSession = { ...session };
+  const serverId = order.serverId;
+  
+  if (!newSession.serverTotals[serverId]) {
+    newSession.serverTotals[serverId] = {
+      name: order.serverName,
+      orders: 0,
+      revenue: 0,
+      cash: 0,
+      card: 0,
+    };
+  }
+  
+  newSession.serverTotals[serverId].orders++;
+  newSession.serverTotals[serverId].revenue += order.total;
+  newSession.totalOrders++;
+  newSession.totalRevenue += order.total;
+  
+  order.payments.forEach(p => {
+    if (p.method === 'cash') {
+      newSession.totalCash += p.amount;
+      newSession.serverTotals[serverId].cash += p.amount;
+    } else {
+      newSession.totalCard += p.amount;
+      newSession.serverTotals[serverId].card += p.amount;
+    }
+  });
+  
+  return newSession;
+}
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
-    case 'SET_VIEW':
-      return { ...state, currentView: action.payload, currentOrder: null, selectedTableId: null };
+    case 'SET_SCREEN':
+      return { ...state, screen: action.payload };
 
-    case 'SELECT_TABLE':
-      return { ...state, selectedTableId: action.payload };
+    case 'LOGIN_SERVER':
+      return { ...state, currentServer: action.payload };
+
+    case 'LOGOUT_SERVER':
+      return { ...state, currentServer: null, currentOrderId: null, currentTableId: null, screen: 'select' };
 
     case 'OPEN_TABLE': {
-      const table = state.tables.find(t => t.id === action.payload);
+      const tableId = action.payload;
+      const table = state.tables.find(t => t.id === tableId);
       if (!table) return state;
-      
-      const existingOrder = state.orders.find(o => o.tableId === action.payload && o.status === 'open');
+
+      // Check if table already has an open order
+      const existingOrder = state.orders.find(o => o.tableId === tableId && o.status === 'open');
       if (existingOrder) {
-        return { ...state, currentOrder: existingOrder, selectedTableId: action.payload, currentView: 'order' };
+        return {
+          ...state,
+          currentOrderId: existingOrder.id,
+          currentTableId: tableId,
+        };
       }
-      
+
+      if (!state.currentServer) return state;
+
       const newOrder: Order = {
         id: uuidv4(),
-        tableId: action.payload,
+        tableId,
         items: [],
         status: 'open',
         createdAt: new Date(),
-        server: state.server,
+        serverId: state.currentServer.id,
+        serverName: state.currentServer.name,
         payments: [],
-        total: 0,
+        subtotal: 0,
         discount: 0,
+        total: 0,
       };
-      
+
       const updatedTables = state.tables.map(t =>
-        t.id === action.payload ? { ...t, status: 'occupied' as const, currentOrder: newOrder.id } : t
+        t.id === tableId ? { ...t, status: 'occupied' as const, currentOrderId: newOrder.id } : t
       );
-      
+
       return {
         ...state,
         tables: updatedTables,
         orders: [...state.orders, newOrder],
-        currentOrder: newOrder,
-        selectedTableId: action.payload,
-        currentView: 'order',
+        currentOrderId: newOrder.id,
+        currentTableId: tableId,
       };
     }
 
-    case 'ADD_ITEM_TO_ORDER': {
-      if (!state.currentOrder) return state;
-      const { menuItem, notes = '', modifiers = {} } = action.payload;
-      
-      const orderItem: OrderItem = {
-        id: uuidv4(),
-        menuItem,
-        quantity: 1,
-        notes,
-        modifiers,
-        status: 'pending',
-      };
-      
-      const updatedOrder = {
-        ...state.currentOrder,
-        items: [...state.currentOrder.items, orderItem],
-        total: calculateTotal([...state.currentOrder.items, orderItem], state.currentOrder.discount),
-      };
-      
-      return {
-        ...state,
-        currentOrder: updatedOrder,
-        orders: state.orders.map(o => o.id === updatedOrder.id ? updatedOrder : o),
-      };
+    case 'ADD_ITEM': {
+      const { orderId, item } = action.payload;
+      const updatedOrders = state.orders.map(o => {
+        if (o.id !== orderId) return o;
+        const newItems = [...o.items, item];
+        const subtotal = calcSubtotal(newItems);
+        return { ...o, items: newItems, subtotal, total: calcTotal(subtotal, o.discount) };
+      });
+      return { ...state, orders: updatedOrders };
     }
 
-    case 'REMOVE_ITEM_FROM_ORDER': {
-      if (!state.currentOrder) return state;
-      const updatedItems = state.currentOrder.items.filter(i => i.id !== action.payload);
-      const updatedOrder = {
-        ...state.currentOrder,
-        items: updatedItems,
-        total: calculateTotal(updatedItems, state.currentOrder.discount),
-      };
-      return {
-        ...state,
-        currentOrder: updatedOrder,
-        orders: state.orders.map(o => o.id === updatedOrder.id ? updatedOrder : o),
-      };
+    case 'REMOVE_ITEM': {
+      const { orderId, itemId } = action.payload;
+      const updatedOrders = state.orders.map(o => {
+        if (o.id !== orderId) return o;
+        const newItems = o.items.filter(i => i.id !== itemId);
+        const subtotal = calcSubtotal(newItems);
+        return { ...o, items: newItems, subtotal, total: calcTotal(subtotal, o.discount) };
+      });
+      return { ...state, orders: updatedOrders };
     }
 
-    case 'UPDATE_ITEM_QUANTITY': {
-      if (!state.currentOrder) return state;
-      const updatedItems = state.currentOrder.items.map(i =>
-        i.id === action.payload.itemId ? { ...i, quantity: Math.max(1, action.payload.quantity) } : i
-      );
-      const updatedOrder = {
-        ...state.currentOrder,
-        items: updatedItems,
-        total: calculateTotal(updatedItems, state.currentOrder.discount),
-      };
-      return {
-        ...state,
-        currentOrder: updatedOrder,
-        orders: state.orders.map(o => o.id === updatedOrder.id ? updatedOrder : o),
-      };
+    case 'UPDATE_QTY': {
+      const { orderId, itemId, qty } = action.payload;
+      const updatedOrders = state.orders.map(o => {
+        if (o.id !== orderId) return o;
+        const newItems = o.items.map(i =>
+          i.id === itemId ? { ...i, quantity: Math.max(1, qty) } : i
+        );
+        const subtotal = calcSubtotal(newItems);
+        return { ...o, items: newItems, subtotal, total: calcTotal(subtotal, o.discount) };
+      });
+      return { ...state, orders: updatedOrders };
     }
 
-    case 'UPDATE_ITEM_NOTES': {
-      if (!state.currentOrder) return state;
-      const updatedItems = state.currentOrder.items.map(i =>
-        i.id === action.payload.itemId ? { ...i, notes: action.payload.notes } : i
-      );
-      const updatedOrder = { ...state.currentOrder, items: updatedItems };
-      return {
-        ...state,
-        currentOrder: updatedOrder,
-        orders: state.orders.map(o => o.id === updatedOrder.id ? updatedOrder : o),
-      };
+    case 'UPDATE_NOTES': {
+      const { orderId, itemId, notes } = action.payload;
+      const updatedOrders = state.orders.map(o => {
+        if (o.id !== orderId) return o;
+        const newItems = o.items.map(i =>
+          i.id === itemId ? { ...i, notes } : i
+        );
+        return { ...o, items: newItems };
+      });
+      return { ...state, orders: updatedOrders };
     }
 
-    case 'SEND_ORDER_TO_KITCHEN': {
-      if (!state.currentOrder) return state;
-      const updatedItems = state.currentOrder.items.map(i =>
-        i.status === 'pending' ? { ...i, status: 'sent' as const } : i
-      );
-      const updatedOrder = { ...state.currentOrder, items: updatedItems };
-      return {
-        ...state,
-        currentOrder: updatedOrder,
-        orders: state.orders.map(o => o.id === updatedOrder.id ? updatedOrder : o),
-      };
+    case 'SEND_TO_KITCHEN': {
+      const orderId = action.payload;
+      const updatedOrders = state.orders.map(o => {
+        if (o.id !== orderId) return o;
+        const newItems = o.items.map(i =>
+          i.status === 'pending' ? { ...i, status: 'sent' as const, sentAt: new Date() } : i
+        );
+        return { ...o, items: newItems };
+      });
+      return { ...state, orders: updatedOrders };
     }
 
-    case 'PROCESS_PAYMENT': {
-      if (!state.currentOrder) return state;
-      const payment: Payment = {
-        id: uuidv4(),
-        method: action.payload.method,
-        amount: action.payload.amount,
-        timestamp: new Date(),
-      };
-      const updatedOrder = {
-        ...state.currentOrder,
-        payments: [...state.currentOrder.payments, payment],
-        status: 'paid' as const,
-        closedAt: new Date(),
-      };
-      
-      const paidTotal = updatedOrder.payments.reduce((sum, p) => sum + p.amount, 0);
-      const newCashBalance = action.payload.method === 'cash' 
-        ? state.cashBalance + action.payload.amount 
-        : state.cashBalance;
-      
-      return {
-        ...state,
-        currentOrder: updatedOrder,
-        orders: state.orders.map(o => o.id === updatedOrder.id ? updatedOrder : o),
-        cashBalance: newCashBalance,
-        dailyRevenue: state.dailyRevenue + paidTotal,
-      };
+    case 'MARK_PREPARING': {
+      const { orderId, itemId } = action.payload;
+      const updatedOrders = state.orders.map(o => {
+        if (o.id !== orderId) return o;
+        const newItems = o.items.map(i =>
+          i.id === itemId ? { ...i, status: 'preparing' as const } : i
+        );
+        return { ...o, items: newItems };
+      });
+      return { ...state, orders: updatedOrders };
+    }
+
+    case 'MARK_READY': {
+      const { orderId, itemId } = action.payload;
+      const updatedOrders = state.orders.map(o => {
+        if (o.id !== orderId) return o;
+        const newItems = o.items.map(i =>
+          i.id === itemId ? { ...i, status: 'ready' as const, readyAt: new Date() } : i
+        );
+        return { ...o, items: newItems };
+      });
+      return { ...state, orders: updatedOrders };
+    }
+
+    case 'MARK_SERVED': {
+      const { orderId, itemId } = action.payload;
+      const updatedOrders = state.orders.map(o => {
+        if (o.id !== orderId) return o;
+        const newItems = o.items.map(i =>
+          i.id === itemId ? { ...i, status: 'served' as const } : i
+        );
+        return { ...o, items: newItems };
+      });
+      return { ...state, orders: updatedOrders };
     }
 
     case 'APPLY_DISCOUNT': {
-      if (!state.currentOrder) return state;
-      const updatedOrder = {
-        ...state.currentOrder,
-        discount: action.payload,
-        total: calculateTotal(state.currentOrder.items, action.payload),
+      const { orderId, discount } = action.payload;
+      const updatedOrders = state.orders.map(o => {
+        if (o.id !== orderId) return o;
+        return { ...o, discount, total: calcTotal(o.subtotal, discount) };
+      });
+      return { ...state, orders: updatedOrders };
+    }
+
+    case 'PROCESS_PAYMENT': {
+      const { orderId, method, amount } = action.payload;
+      const payment: Payment = {
+        id: uuidv4(),
+        method,
+        amount,
+        timestamp: new Date(),
       };
+      const updatedOrders = state.orders.map(o => {
+        if (o.id !== orderId) return o;
+        return { ...o, payments: [...o.payments, payment] };
+      });
+
+      const cashDelta = method === 'cash' ? amount : 0;
+
       return {
         ...state,
-        currentOrder: updatedOrder,
-        orders: state.orders.map(o => o.id === updatedOrder.id ? updatedOrder : o),
+        orders: updatedOrders,
+        cashBalance: state.cashBalance + cashDelta,
       };
     }
 
     case 'CLOSE_ORDER': {
-      if (!state.currentOrder) return state;
-      const updatedOrder = { ...state.currentOrder, status: 'closed' as const, closedAt: new Date() };
+      const orderId = action.payload;
+      const order = state.orders.find(o => o.id === orderId);
+      if (!order) return state;
+
+      const updatedOrders = state.orders.map(o =>
+        o.id === orderId ? { ...o, status: 'closed' as const, closedAt: new Date() } : o
+      );
+
+      const updatedTables = state.tables.map(t =>
+        t.id === order.tableId ? { ...t, status: 'free' as const, currentOrderId: undefined } : t
+      );
+
+      // Update session
+      const newSession = updateSessionFromOrder(state.session, { ...order, status: 'closed', closedAt: new Date() });
+
       return {
         ...state,
-        currentOrder: null,
-        selectedTableId: null,
-        currentView: 'floor',
-        orders: state.orders.map(o => o.id === updatedOrder.id ? updatedOrder : o),
+        orders: updatedOrders,
+        tables: updatedTables,
+        session: newSession,
+        currentOrderId: null,
+        currentTableId: null,
       };
     }
 
+    case 'SET_TABLE_STATUS': {
+      const { tableId, status } = action.payload;
+      const updatedTables = state.tables.map(t =>
+        t.id === tableId ? { ...t, status } : t
+      );
+      return { ...state, tables: updatedTables };
+    }
+
     case 'TRANSFER_TABLE': {
-      const { fromTableId, toTableId } = action.payload;
-      const order = state.orders.find(o => o.tableId === fromTableId && o.status === 'open');
+      const { fromId, toId } = action.payload;
+      const order = state.orders.find(o => o.tableId === fromId && o.status === 'open');
       if (!order) return state;
-      
+
       const updatedOrders = state.orders.map(o =>
-        o.id === order.id ? { ...o, tableId: toTableId } : o
+        o.id === order.id ? { ...o, tableId: toId } : o
       );
       const updatedTables = state.tables.map(t => {
-        if (t.id === fromTableId) return { ...t, status: 'free' as const, currentOrder: undefined };
-        if (t.id === toTableId) return { ...t, status: 'occupied' as const, currentOrder: order.id };
+        if (t.id === fromId) return { ...t, status: 'free' as const, currentOrderId: undefined };
+        if (t.id === toId) return { ...t, status: 'occupied' as const, currentOrderId: order.id };
         return t;
       });
-      
+
       return { ...state, tables: updatedTables, orders: updatedOrders };
     }
 
-    case 'SET_TABLE_STATUS': {
-      const updatedTables = state.tables.map(t =>
-        t.id === action.payload.tableId ? { ...t, status: action.payload.status } : t
-      );
-      return { ...state, tables: updatedTables };
-    }
-
-    case 'CLEAR_TABLE': {
-      const updatedTables = state.tables.map(t =>
-        t.id === action.payload ? { ...t, status: 'free' as const, currentOrder: undefined } : t
-      );
-      return { ...state, tables: updatedTables };
+    case 'CLOSE_SESSION': {
+      const closedSession = { ...state.session, closedAt: new Date() };
+      return {
+        ...state,
+        closedSessions: [...state.closedSessions, closedSession],
+        session: createSession(),
+        orders: [],
+        tables: initialTables,
+        cashBalance: 200,
+        screen: 'select',
+        currentServer: null,
+        currentOrderId: null,
+        currentTableId: null,
+      };
     }
 
     default:
       return state;
   }
-}
-
-function calculateTotal(items: OrderItem[], discount: number): number {
-  const subtotal = items.reduce((sum, item) => sum + (item.menuItem.price * item.quantity), 0);
-  return subtotal * (1 - discount / 100);
 }
 
 interface ContextType {

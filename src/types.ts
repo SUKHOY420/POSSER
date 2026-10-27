@@ -5,6 +5,7 @@ export interface MenuItem {
   category: string;
   color: string;
   emoji: string;
+  isFood: boolean;
   modifiers?: Modifier[];
 }
 
@@ -21,7 +22,16 @@ export interface OrderItem {
   quantity: number;
   notes: string;
   modifiers: Record<string, string>;
-  status: 'pending' | 'sent' | 'ready' | 'served';
+  status: 'pending' | 'sent' | 'preparing' | 'ready' | 'served';
+  sentAt?: Date;
+  readyAt?: Date;
+}
+
+export interface Payment {
+  id: string;
+  method: 'cash' | 'card';
+  amount: number;
+  timestamp: Date;
 }
 
 export interface Order {
@@ -31,29 +41,29 @@ export interface Order {
   status: 'open' | 'closed' | 'paid';
   createdAt: Date;
   closedAt?: Date;
-  server: string;
+  serverId: string;
+  serverName: string;
   payments: Payment[];
-  total: number;
+  subtotal: number;
   discount: number;
-}
-
-export interface Payment {
-  id: string;
-  method: 'cash' | 'card' | 'split';
-  amount: number;
-  timestamp: Date;
+  total: number;
 }
 
 export interface Table {
   id: string;
   name: string;
   seats: number;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
   status: 'free' | 'occupied' | 'reserved' | 'cleaning';
-  currentOrder?: string;
+  currentOrderId?: string;
+}
+
+export interface Server {
+  id: string;
+  name: string;
+  pin: string;
+  role: 'admin' | 'server' | 'kitchen';
+  color: string;
+  isActive: boolean;
 }
 
 export interface Category {
@@ -63,4 +73,16 @@ export interface Category {
   color: string;
 }
 
-export type ViewMode = 'dashboard' | 'floor' | 'order' | 'reports' | 'settings';
+export type ScreenType = 'select' | 'main' | 'kitchen' | 'server' | 'close';
+
+export interface Session {
+  id: string;
+  date: Date;
+  openedAt: Date;
+  closedAt?: Date;
+  totalRevenue: number;
+  totalCash: number;
+  totalCard: number;
+  totalOrders: number;
+  serverTotals: Record<string, { name: string; orders: number; revenue: number; cash: number; card: number }>;
+}
