@@ -2,13 +2,16 @@ import { usePOS } from '../store';
 import { motion } from 'framer-motion';
 import { DollarSign, Banknote, CreditCard, Users, Receipt, CheckCircle, AlertTriangle, Printer, LogOut } from 'lucide-react';
 import { useState } from 'react';
+import { usePrinter } from '../lib/hooks';
 
 export default function CloseSession() {
   const { state, dispatch } = usePOS();
+  const { printZReport } = usePrinter();
   const [confirmed, setConfirmed] = useState(false);
   const [expectedCash, setExpectedCash] = useState(state.cashBalance.toString());
   const [actualCash, setActualCash] = useState('');
   const [notes, setNotes] = useState('');
+  const [printing, setPrinting] = useState(false);
 
   const session = state.session;
   const openOrders = state.orders.filter(o => o.status === 'open');
@@ -18,7 +21,14 @@ export default function CloseSession() {
   const actualCashNum = parseFloat(actualCash) || 0;
   const cashDifference = actualCashNum - expectedCashNum;
 
-  const handleClose = () => {
+  const handleClose = async () => {
+    setPrinting(true);
+    // Imprimer le rapport Z
+    await printZReport({
+      ...session,
+      closedAt: new Date(),
+    });
+    setPrinting(false);
     dispatch({ type: 'CLOSE_SESSION' });
   };
 

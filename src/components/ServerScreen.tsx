@@ -1,13 +1,16 @@
 import { useState } from 'react';
 import { usePOS } from '../store';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Minus, Send, Trash2, CreditCard, Banknote, ArrowLeft, Search, X, StickyNote, Percent, LogOut, Grid3X3 } from 'lucide-react';
+import { Plus, Minus, Send, Trash2, CreditCard, Banknote, ArrowLeft, Search, X, StickyNote, Percent, LogOut, Grid3X3, Printer, Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { categories, menuItems } from '../data';
 import { MenuItem, OrderItem } from '../types';
 import { v4 as uuidv4 } from 'uuid';
+import { usePrinter, usePaymentTerminal } from '../lib/hooks';
 
 export default function ServerScreen() {
   const { state, dispatch } = usePOS();
+  const { printReceipt, sendToKitchen } = usePrinter();
+  const { processPayment, status: terminalStatus, progress: paymentProgress } = usePaymentTerminal();
   const [view, setView] = useState<'tables' | 'order'>('tables');
   const [activeCategory, setActiveCategory] = useState('Tous');
   const [searchQuery, setSearchQuery] = useState('');
@@ -19,6 +22,9 @@ export default function ServerScreen() {
   const [noteText, setNoteText] = useState('');
   const [showDiscount, setShowDiscount] = useState(false);
   const [discountValue, setDiscountValue] = useState('');
+  const [paymentProcessing, setPaymentProcessing] = useState(false);
+  const [paymentResult, setPaymentResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [sendingToKitchen, setSendingToKitchen] = useState(false);
 
   const server = state.currentServer;
   const currentOrder = state.orders.find(o => o.id === state.currentOrderId);
@@ -71,12 +77,73 @@ export default function ServerScreen() {
     }
   };
 
-  const handlePayment = (method: 'cash' | 'card') => {
-    if (currentOrder && state.currentOrderId) {
-      dispatch({ type: 'PROCESS_PAYMENT', payload: { orderId: state.currentOrderId, method, amount: currentOrder.total } });
-      setShowPayment(false);
-      dispatch({ type: 'CLOSE_ORDER', payload: state.currentOrderId });
-      setView('tables');
+  const handlePayment = async (method: 'cash' | 'card') => {
+    if (!currentOrder || !state.currentOrderId || !currentTable) return;
+
+    setPaymentProcessing(true);
+    setPaymentResult(null);
+
+    try {
+      if (method === 'card') {
+        // Utiliser le terminal de paiement
+        const response = await processPayment(currentOrder.total, state.currentOrderId);
+        
+        if (response.success) {
+          setPaymentResult({
+            success: true,
+            message: `✓ Paiement accepté • ${response.cardType} ****${response.cardLast4} • Auto: ${response.authorizationCode}`
+          });
+          
+          // Enregistrer le paiement
+          dispatch({ type: 'PROCESS_PAYMENT', payload: { orderId: state.currentOrderId, method: 'card', amount: currentOrder.total } });
+          
+          // Imprimer le ticket
+          await printReceipt(currentOrder, currentTable);
+          
+          setTimeout(() => {
+            setShowPayment(false);
+            setPaymentResult(null);
+            if (state.currentOrderId) {
+              dispatch({ type: 'CLOSE_ORDER', payload: state.currentOrderId });
+            }
+            setView('tables');
+            setPaymentProcessing(false);
+          }, 2000);
+        } else {
+          setPaymentResult({
+            success: false,
+            message: `✗ Paiement refusé : ${response.errorMessage}`
+          });
+          setPaymentProcessing(false);
+        }
+      } else {
+        // Espèces - pas besoin de TPE
+        dispatch({ type: 'PROCESS_PAYMENT', payload: { orderId: state.currentOrderId, method: 'cash', amount: currentOrder.total } });
+        
+        // Imprimer le ticket
+        await printReceipt(currentOrder, currentTable);
+        
+        setPaymentResult({
+          success: true,
+          message: '✓ Paiement espèces enregistré • Ticket imprimé'
+        });
+        
+        setTimeout(() => {
+          setShowPayment(false);
+          setPaymentResult(null);
+          if (state.currentOrderId) {
+            dispatch({ type: 'CLOSE_ORDER', payload: state.currentOrderId });
+          }
+          setView('tables');
+          setPaymentProcessing(false);
+        }, 1500);
+      }
+    } catch (error) {
+      setPaymentResult({
+        success: false,
+        message: '✗ Erreur de communication avec le terminal'
+      });
+      setPaymentProcessing(false);
     }
   };
 
@@ -258,7 +325,13 @@ export default function ServerScreen() {
               <Percent className="w-4 h-4" />
             </button>
             <button
-              onClick={() => state.currentOrderId && dispatch({ type: 'SEND_TO_KITCHEN', payload: state.currentOrderId })}
+              onClick={async () => {
+                if (state.currentOrderId && currentOrder && currentTable) {
+                  dispatch({ type: 'SEND_TO_KITCHEN', payload: state.currentOrderId });
+                  // Imprimer le ticket cuisine
+                  await sendToKitchen(currentOrder, currentTable);
+                }
+              }}
               className="p-2 bg-blue-500/10 border border-blue-500/30 rounded-lg text-blue-400"
             >
               <Send className="w-4 h-4" />
@@ -391,18 +464,70 @@ export default function ServerScreen() {
 
       {/* Payment Modal */}
       {showPayment && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setShowPayment(false)}>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => !paymentProcessing && setShowPayment(false)}>
           <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="bg-slate-800 rounded-2xl border border-slate-700 p-5 w-full max-w-sm" onClick={e => e.stopPropagation()}>
             <h3 className="text-xl font-bold text-white text-center mb-2">Paiement</h3>
             <p className="text-2xl font-bold text-emerald-400 text-center mb-5">{currentOrder?.total.toFixed(2)} €</p>
+            
+            {/* Payment Progress */}
+            {paymentProcessing && paymentProgress && (
+              <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-xl">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
+                  <span className="text-sm text-blue-300">{paymentProgress.message}</span>
+                </div>
+                <div className="mt-2 h-1 bg-slate-700 rounded-full overflow-hidden">
+                  <motion.div
+                    initial={{ width: '0%' }}
+                    animate={{ width: '100%' }}
+                    transition={{ duration: 3 }}
+                    className="h-full bg-blue-500 rounded-full"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Payment Result */}
+            {paymentResult && (
+              <div className={`mb-4 p-3 rounded-xl border ${
+                paymentResult.success ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-red-500/10 border-red-500/30'
+              }`}>
+                <div className="flex items-center gap-2">
+                  {paymentResult.success ? (
+                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                  ) : (
+                    <XCircle className="w-5 h-5 text-red-400" />
+                  )}
+                  <span className={`text-sm ${paymentResult.success ? 'text-emerald-300' : 'text-red-300'}`}>
+                    {paymentResult.message}
+                  </span>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-3">
-              <button onClick={() => handlePayment('cash')} className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 active:scale-[0.98]">
+              <button 
+                onClick={() => handlePayment('cash')} 
+                disabled={paymentProcessing}
+                className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
+              >
                 <Banknote className="w-5 h-5" /> Espèces
               </button>
-              <button onClick={() => handlePayment('card')} className="w-full py-4 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 active:scale-[0.98]">
+              <button 
+                onClick={() => handlePayment('card')} 
+                disabled={paymentProcessing}
+                className="w-full py-4 bg-blue-500 hover:bg-blue-600 disabled:bg-slate-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
+              >
                 <CreditCard className="w-5 h-5" /> Carte bancaire
+                {terminalStatus === 'ready' && <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">TPE OK</span>}
               </button>
-              <button onClick={() => setShowPayment(false)} className="w-full py-3 bg-slate-700 text-slate-300 rounded-xl">Annuler</button>
+              <button 
+                onClick={() => setShowPayment(false)} 
+                disabled={paymentProcessing}
+                className="w-full py-3 bg-slate-700 disabled:opacity-50 text-slate-300 rounded-xl"
+              >
+                Annuler
+              </button>
             </div>
           </motion.div>
         </motion.div>

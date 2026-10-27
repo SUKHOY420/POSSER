@@ -4,6 +4,7 @@ import MainScreen from './components/MainScreen';
 import KitchenScreen from './components/KitchenScreen';
 import ServerScreen from './components/ServerScreen';
 import CloseSession from './components/CloseSession';
+import HardwareSetup from './components/HardwareSetup';
 
 function AppContent() {
   const { state } = usePOS();
@@ -19,6 +20,8 @@ function AppContent() {
       return <ServerScreen />;
     case 'close':
       return <CloseSession />;
+    case 'hardware':
+      return <HardwareSetup />;
     default:
       return <ScreenSelect />;
   }

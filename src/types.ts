@@ -73,7 +73,7 @@ export interface Category {
   color: string;
 }
 
-export type ScreenType = 'select' | 'main' | 'kitchen' | 'server' | 'close';
+export type ScreenType = 'select' | 'main' | 'kitchen' | 'server' | 'close' | 'hardware';
 
 export interface Session {
   id: string;

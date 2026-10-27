@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { usePOS } from '../store';
 import { motion } from 'framer-motion';
-import { Monitor, ChefHat, Tablet, LogOut, Lock } from 'lucide-react';
+import { Monitor, ChefHat, Tablet, LogOut, Lock, Settings, Printer, CreditCard } from 'lucide-react';
 import { servers } from '../data';
 import { Server } from '../types';
+import { usePrinter, usePaymentTerminal } from '../lib/hooks';
 
 export default function ScreenSelect() {
   const { state, dispatch } = usePOS();
+  const { isConnected: printerConnected } = usePrinter();
+  const { status: terminalStatus } = usePaymentTerminal();
   const [selectedRole, setSelectedRole] = useState<'main' | 'kitchen' | 'server' | null>(null);
   const [selectedServer, setSelectedServer] = useState<Server | null>(null);
   const [pinInput, setPinInput] = useState('');
@@ -83,13 +86,41 @@ export default function ScreenSelect() {
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-8"
+          className="text-center mb-6"
         >
           <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center mb-4 shadow-lg shadow-blue-500/20">
             <Monitor className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-3xl font-bold text-white">QuickPOS</h1>
           <p className="text-slate-400 mt-1">Sélectionnez votre poste</p>
+        </motion.div>
+
+        {/* Peripheral Status */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.2 }}
+          className="flex items-center justify-center gap-3 mb-6"
+        >
+          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs ${
+            printerConnected ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400' : 'bg-slate-700/50 border border-slate-600/30 text-slate-400'
+          }`}>
+            <Printer className="w-3 h-3" />
+            <span>{printerConnected ? 'Imprimante OK' : 'Imprimante'}</span>
+          </div>
+          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs ${
+            terminalStatus === 'ready' ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400' : 'bg-slate-700/50 border border-slate-600/30 text-slate-400'
+          }`}>
+            <CreditCard className="w-3 h-3" />
+            <span>{terminalStatus === 'ready' ? 'TPE Prêt' : 'TPE'}</span>
+          </div>
+          <button
+            onClick={() => dispatch({ type: 'SET_SCREEN', payload: 'hardware' })}
+            className="p-1.5 bg-slate-700/50 border border-slate-600/30 rounded-full text-slate-400 hover:text-white hover:bg-slate-600/50 transition-colors"
+            title="Configuration périphériques"
+          >
+            <Settings className="w-3.5 h-3.5" />
+          </button>
         </motion.div>
 
         {/* Step 1: Role Selection */}

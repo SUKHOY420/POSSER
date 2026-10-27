@@ -1,10 +1,13 @@
 import { usePOS } from '../store';
 import { motion } from 'framer-motion';
-import { Clock, Users, DollarSign, LogOut, ChefHat, AlertCircle, CheckCircle2, Timer } from 'lucide-react';
+import { Clock, Users, DollarSign, LogOut, ChefHat, AlertCircle, CheckCircle2, Timer, Settings, Printer, CreditCard } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { usePrinter, usePaymentTerminal } from '../lib/hooks';
 
 export default function MainScreen() {
   const { state, dispatch } = usePOS();
+  const { isConnected: printerConnected } = usePrinter();
+  const { status: terminalStatus } = usePaymentTerminal();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [filter, setFilter] = useState<'all' | 'pending' | 'preparing' | 'ready'>('all');
 
@@ -91,6 +94,30 @@ export default function MainScreen() {
               {currentTime.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
             </p>
           </div>
+
+          {/* Peripheral status */}
+          <div className="hidden md:flex items-center gap-2">
+            <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
+              printerConnected ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-700/50 text-slate-400'
+            }`}>
+              <Printer className="w-3 h-3" />
+              <span>{printerConnected ? 'OK' : '-'}</span>
+            </div>
+            <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
+              terminalStatus === 'ready' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-700/50 text-slate-400'
+            }`}>
+              <CreditCard className="w-3 h-3" />
+              <span>{terminalStatus === 'ready' ? 'OK' : '-'}</span>
+            </div>
+          </div>
+
+          <button
+            onClick={() => dispatch({ type: 'SET_SCREEN', payload: 'hardware' })}
+            className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+            title="Configuration périphériques"
+          >
+            <Settings className="w-5 h-5" />
+          </button>
 
           <button
             onClick={() => dispatch({ type: 'LOGOUT_SERVER' })}
