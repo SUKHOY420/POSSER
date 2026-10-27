@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Clock, Users, DollarSign, LogOut, ChefHat, AlertCircle, CheckCircle2, Timer, Settings, Lock } from 'lucide-react';
+import { Clock, Users, DollarSign, LogOut, ChefHat, AlertCircle, CheckCircle2, Timer, Settings, Lock, Eye, History, CreditCard } from 'lucide-react';
 import { usePOS } from '../store';
+import { Ticket } from '../types';
+import TicketDetailModal from './TicketDetailModal';
+import TicketHistoryModal from './TicketHistoryModal';
+import EmergencyPaymentModal from './EmergencyPaymentModal';
 
 export default function MainScreen() {
   const { state, dispatch } = usePOS();
@@ -10,6 +14,11 @@ export default function MainScreen() {
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [adminPassword, setAdminPassword] = useState('');
   const [passwordError, setPasswordError] = useState(false);
+  
+  // Nouveaux états pour les modals
+  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+  const [showHistory, setShowHistory] = useState<{ type: 'table' | 'server'; id: string; name: string } | null>(null);
+  const [emergencyTicket, setEmergencyTicket] = useState<Ticket | null>(null);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -194,6 +203,7 @@ export default function MainScreen() {
           {filteredTables.map((table, index) => {
             const colors = getTableColors(table.status);
             const tickets = state.tickets.filter(t => table.ticketIds.includes(t.id) && (t.status === 'OPEN' || t.status === 'DRAFT'));
+            const allTableTickets = state.tickets.filter(t => table.ticketIds.includes(t.id));
             
             return (
               <motion.div 
@@ -203,7 +213,7 @@ export default function MainScreen() {
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: index * 0.05 }}
                 whileHover={{ scale: 1.05, y: -5 }}
-                className={`rounded-2xl border-2 ${colors.bg} p-4 flex flex-col items-center justify-center gap-2 relative hover-lift touch-target min-h-[140px]`}
+                className={`rounded-2xl border-2 ${colors.bg} p-4 flex flex-col items-center justify-center gap-2 relative hover-lift touch-target min-h-[180px]`}
               >
                 <span className="text-2xl md:text-3xl font-bold text-white">{table.name}</span>
                 <span className="text-xs text-slate-400">{table.seats} places</span>
@@ -226,6 +236,52 @@ export default function MainScreen() {
                   >
                     {tickets.reduce((sum, t) => sum + t.items.length, 0)} art.
                   </motion.div>
+                )}
+                
+                {/* Action Buttons - Only for occupied tables */}
+                {table.status !== 'FREE' && (
+                  <div className="absolute bottom-2 left-2 right-2 flex gap-1">
+                    {tickets.length > 0 && (
+                      <>
+                        <motion.button
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedTicket(tickets[0]);
+                          }}
+                          className="flex-1 p-1.5 glass rounded-lg text-white hover:bg-white/20 transition-colors"
+                          title="Voir le ticket"
+                        >
+                          <Eye className="w-3 h-3 mx-auto" />
+                        </motion.button>
+                        <motion.button
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEmergencyTicket(tickets[0]);
+                          }}
+                          className="flex-1 p-1.5 bg-orange-500/20 border border-orange-500/30 rounded-lg text-orange-400 hover:bg-orange-500/30 transition-colors"
+                          title="Encaisser d'urgence"
+                        >
+                          <CreditCard className="w-3 h-3 mx-auto" />
+                        </motion.button>
+                      </>
+                    )}
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowHistory({ type: 'table', id: table.id, name: table.name });
+                      }}
+                      className="flex-1 p-1.5 glass rounded-lg text-white hover:bg-white/20 transition-colors"
+                      title="Historique de la table"
+                    >
+                      <History className="w-3 h-3 mx-auto" />
+                    </motion.button>
+                  </div>
                 )}
               </motion.div>
             );
@@ -252,6 +308,42 @@ export default function MainScreen() {
           <span className="text-slate-300">Réservée</span>
         </div>
       </div>
+
+      {/* Ticket Detail Modal */}
+      <AnimatePresence>
+        {selectedTicket && (
+          <TicketDetailModal
+            ticket={selectedTicket}
+            onClose={() => setSelectedTicket(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Ticket History Modal */}
+      <AnimatePresence>
+        {showHistory && (
+          <TicketHistoryModal
+            filterType={showHistory.type}
+            filterId={showHistory.id}
+            filterName={showHistory.name}
+            onClose={() => setShowHistory(null)}
+            onViewTicket={(ticket) => {
+              setShowHistory(null);
+              setSelectedTicket(ticket);
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Emergency Payment Modal */}
+      <AnimatePresence>
+        {emergencyTicket && (
+          <EmergencyPaymentModal
+            ticket={emergencyTicket}
+            onClose={() => setEmergencyTicket(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
