@@ -5,26 +5,25 @@ import KitchenScreen from './components/KitchenScreen';
 import ServerScreen from './components/ServerScreen';
 import CloseSession from './components/CloseSession';
 import HardwareSetup from './components/HardwareSetup';
+import { NotificationSystem } from './components/Notifications';
+import { SyncIndicator } from './components/SyncIndicator';
 
 function AppContent() {
   const { state } = usePOS();
 
-  switch (state.screen) {
-    case 'select':
-      return <ScreenSelect />;
-    case 'main':
-      return <MainScreen />;
-    case 'kitchen':
-      return <KitchenScreen />;
-    case 'server':
-      return <ServerScreen />;
-    case 'close':
-      return <CloseSession />;
-    case 'hardware':
-      return <HardwareSetup />;
-    default:
-      return <ScreenSelect />;
-  }
+  return (
+    <>
+      {state.screen !== 'select' && <NotificationSystem />}
+      {state.screen !== 'select' && <SyncIndicator />}
+      
+      {state.screen === 'select' && <ScreenSelect />}
+      {state.screen === 'main' && <MainScreen />}
+      {state.screen === 'kitchen' && <KitchenScreen />}
+      {state.screen === 'server' && <ServerScreen />}
+      {state.screen === 'close' && <CloseSession />}
+      {state.screen === 'hardware' && <HardwareSetup />}
+    </>
+  );
 }
 
 export default function App() {

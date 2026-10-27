@@ -1,8 +1,9 @@
 import { usePOS } from '../store';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Clock, ChefHat, Check, Play, LogOut, Flame } from 'lucide-react';
+import { Clock, ChefHat, Check, Play, LogOut, Flame, AlertCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Order, OrderItem, Table } from '../types';
+import { syncManager } from '../lib/sync';
 
 interface KitchenOrder {
   order: Order;
@@ -13,10 +14,36 @@ interface KitchenOrder {
 export default function KitchenScreen() {
   const { state, dispatch } = usePOS();
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [newOrderAlert, setNewOrderAlert] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
+  }, []);
+
+  // Écouter les nouvelles commandes pour alerter la cuisine
+  useEffect(() => {
+    const unsub = syncManager.on('KITCHEN_NOTIFICATION', (event: any) => {
+      setNewOrderAlert(true);
+      // Jouer un son de notification
+      try {
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        oscillator.frequency.value = 800;
+        oscillator.type = 'sine';
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.5);
+      } catch (e) {
+        console.log('Audio not supported');
+      }
+      setTimeout(() => setNewOrderAlert(false), 3000);
+    });
+    return unsub;
   }, []);
 
   const kitchenOrders: KitchenOrder[] = state.orders
@@ -74,13 +101,24 @@ export default function KitchenScreen() {
   return (
     <div className="h-screen flex flex-col bg-slate-900">
       {/* Header */}
-      <header className="h-16 bg-gradient-to-r from-amber-900/50 to-orange-900/50 border-b border-amber-700/30 flex items-center justify-between px-4 md:px-6 shrink-0">
+      <header className={`h-16 border-b flex items-center justify-between px-4 md:px-6 shrink-0 transition-colors ${
+        newOrderAlert 
+          ? 'bg-gradient-to-r from-red-900/70 to-orange-900/70 border-red-500/50 animate-pulse' 
+          : 'bg-gradient-to-r from-amber-900/50 to-orange-900/50 border-amber-700/30'
+      }`}>
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
             <ChefHat className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-white">Cuisine</h1>
+            <h1 className="text-lg font-bold text-white flex items-center gap-2">
+              Cuisine
+              {newOrderAlert && (
+                <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full animate-bounce">
+                  NOUVELLE COMMANDE !
+                </span>
+              )}
+            </h1>
             <p className="text-xs text-amber-300/70">Kitchen Display System</p>
           </div>
         </div>

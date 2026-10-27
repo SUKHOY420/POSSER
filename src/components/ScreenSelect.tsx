@@ -93,6 +93,9 @@ export default function ScreenSelect() {
           </div>
           <h1 className="text-3xl font-bold text-white">QuickPOS</h1>
           <p className="text-slate-400 mt-1">Sélectionnez votre poste</p>
+          <p className="text-xs text-slate-500 mt-2 max-w-md mx-auto">
+            💡 Pour tester la synchronisation : ouvrez cette page dans plusieurs onglets/fenêtres et choisissez un poste différent pour chacun
+          </p>
         </motion.div>
 
         {/* Peripheral Status */}

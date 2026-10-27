@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useReducer, ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, ReactNode, useEffect } from 'react';
 import { Order, OrderItem, Table, Payment, ScreenType, Server, Session } from './types';
 import { initialTables, servers } from './data';
 import { v4 as uuidv4 } from 'uuid';
+import { syncManager } from './lib/sync';
 
 interface State {
   screen: ScreenType;
@@ -34,7 +35,18 @@ type Action =
   | { type: 'CLOSE_ORDER'; payload: string }
   | { type: 'SET_TABLE_STATUS'; payload: { tableId: string; status: Table['status'] } }
   | { type: 'TRANSFER_TABLE'; payload: { fromId: string; toId: string } }
-  | { type: 'CLOSE_SESSION' };
+  | { type: 'CLOSE_SESSION' }
+  // Sync actions (reçues d'autres postes)
+  | { type: 'SYNC_ADD_ORDER'; payload: Order }
+  | { type: 'SYNC_UPDATE_ORDER'; payload: Order }
+  | { type: 'SYNC_CLOSE_ORDER'; payload: string }
+  | { type: 'SYNC_ADD_ITEM'; payload: { orderId: string; item: OrderItem } }
+  | { type: 'SYNC_REMOVE_ITEM'; payload: { orderId: string; itemId: string } }
+  | { type: 'SYNC_UPDATE_ITEM'; payload: { orderId: string; itemId: string; updates: Partial<OrderItem> } }
+  | { type: 'SYNC_SEND_TO_KITCHEN'; payload: string }
+  | { type: 'SYNC_ITEM_STATUS'; payload: { orderId: string; itemId: string; status: OrderItem['status'] } }
+  | { type: 'SYNC_TABLE_STATUS'; payload: { tableId: string; status: Table['status'] } }
+  | { type: 'SYNC_PAYMENT'; payload: { orderId: string; method: 'cash' | 'card'; amount: number } };
 
 function createSession(): Session {
   return {
@@ -350,6 +362,135 @@ function reducer(state: State, action: Action): State {
       };
     }
 
+    // ===== SYNC ACTIONS (reçues d'autres postes) =====
+    
+    case 'SYNC_ADD_ORDER': {
+      const newOrder = action.payload;
+      if (state.orders.find(o => o.id === newOrder.id)) return state;
+      const updatedTables = state.tables.map(t =>
+        t.id === newOrder.tableId ? { ...t, status: 'occupied' as const, currentOrderId: newOrder.id } : t
+      );
+      return {
+        ...state,
+        orders: [...state.orders, newOrder],
+        tables: updatedTables,
+      };
+    }
+
+    case 'SYNC_UPDATE_ORDER': {
+      const updatedOrder = action.payload;
+      return {
+        ...state,
+        orders: state.orders.map(o => o.id === updatedOrder.id ? updatedOrder : o),
+      };
+    }
+
+    case 'SYNC_CLOSE_ORDER': {
+      const orderId = action.payload;
+      const order = state.orders.find(o => o.id === orderId);
+      if (!order) return state;
+      const updatedOrders = state.orders.map(o =>
+        o.id === orderId ? { ...o, status: 'closed' as const, closedAt: new Date() } : o
+      );
+      const updatedTables = state.tables.map(t =>
+        t.id === order.tableId ? { ...t, status: 'free' as const, currentOrderId: undefined } : t
+      );
+      const newSession = updateSessionFromOrder(state.session, { ...order, status: 'closed', closedAt: new Date() });
+      return {
+        ...state,
+        orders: updatedOrders,
+        tables: updatedTables,
+        session: newSession,
+      };
+    }
+
+    case 'SYNC_ADD_ITEM': {
+      const { orderId, item } = action.payload;
+      const updatedOrders = state.orders.map(o => {
+        if (o.id !== orderId) return o;
+        const newItems = [...o.items, item];
+        const subtotal = calcSubtotal(newItems);
+        return { ...o, items: newItems, subtotal, total: calcTotal(subtotal, o.discount) };
+      });
+      return { ...state, orders: updatedOrders };
+    }
+
+    case 'SYNC_REMOVE_ITEM': {
+      const { orderId, itemId } = action.payload;
+      const updatedOrders = state.orders.map(o => {
+        if (o.id !== orderId) return o;
+        const newItems = o.items.filter(i => i.id !== itemId);
+        const subtotal = calcSubtotal(newItems);
+        return { ...o, items: newItems, subtotal, total: calcTotal(subtotal, o.discount) };
+      });
+      return { ...state, orders: updatedOrders };
+    }
+
+    case 'SYNC_UPDATE_ITEM': {
+      const { orderId, itemId, updates } = action.payload;
+      const updatedOrders = state.orders.map(o => {
+        if (o.id !== orderId) return o;
+        const newItems = o.items.map(i =>
+          i.id === itemId ? { ...i, ...updates } : i
+        );
+        const subtotal = calcSubtotal(newItems);
+        return { ...o, items: newItems, subtotal, total: calcTotal(subtotal, o.discount) };
+      });
+      return { ...state, orders: updatedOrders };
+    }
+
+    case 'SYNC_SEND_TO_KITCHEN': {
+      const orderId = action.payload;
+      const updatedOrders = state.orders.map(o => {
+        if (o.id !== orderId) return o;
+        const newItems = o.items.map(i =>
+          i.status === 'pending' ? { ...i, status: 'sent' as const, sentAt: new Date() } : i
+        );
+        return { ...o, items: newItems };
+      });
+      return { ...state, orders: updatedOrders };
+    }
+
+    case 'SYNC_ITEM_STATUS': {
+      const { orderId, itemId, status } = action.payload;
+      const updatedOrders = state.orders.map(o => {
+        if (o.id !== orderId) return o;
+        const newItems = o.items.map(i =>
+          i.id === itemId ? { ...i, status } : i
+        );
+        return { ...o, items: newItems };
+      });
+      return { ...state, orders: updatedOrders };
+    }
+
+    case 'SYNC_TABLE_STATUS': {
+      const { tableId, status } = action.payload;
+      const updatedTables = state.tables.map(t =>
+        t.id === tableId ? { ...t, status: status as Table['status'] } : t
+      );
+      return { ...state, tables: updatedTables };
+    }
+
+    case 'SYNC_PAYMENT': {
+      const { orderId, method, amount } = action.payload;
+      const payment: Payment = {
+        id: uuidv4(),
+        method,
+        amount,
+        timestamp: new Date(),
+      };
+      const updatedOrders = state.orders.map(o => {
+        if (o.id !== orderId) return o;
+        return { ...o, payments: [...o.payments, payment] };
+      });
+      const cashDelta = method === 'cash' ? amount : 0;
+      return {
+        ...state,
+        orders: updatedOrders,
+        cashBalance: state.cashBalance + cashDelta,
+      };
+    }
+
     default:
       return state;
   }
@@ -364,8 +505,203 @@ const POSContext = createContext<ContextType | undefined>(undefined);
 
 export function POSProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
+
+  // Wrapper dispatch qui broadcast les changements
+  const syncDispatch = React.useCallback((action: Action) => {
+    // Dispatch local
+    dispatch(action);
+
+    // Broadcast aux autres postes
+    switch (action.type) {
+      case 'OPEN_TABLE': {
+        // Le broadcast sera fait dans un useEffect après que l'ordre soit créé
+        break;
+      }
+
+      case 'ADD_ITEM':
+        syncManager.broadcast({ type: 'ITEM_ADDED', orderId: action.payload.orderId, item: action.payload.item });
+        break;
+
+      case 'REMOVE_ITEM':
+        syncManager.broadcast({ type: 'ITEM_REMOVED', orderId: action.payload.orderId, itemId: action.payload.itemId });
+        break;
+
+      case 'UPDATE_QTY':
+        syncManager.broadcast({ 
+          type: 'ITEM_UPDATED', 
+          orderId: action.payload.orderId, 
+          itemId: action.payload.itemId, 
+          updates: { quantity: action.payload.qty } 
+        });
+        break;
+
+      case 'UPDATE_NOTES':
+        syncManager.broadcast({ 
+          type: 'ITEM_UPDATED', 
+          orderId: action.payload.orderId, 
+          itemId: action.payload.itemId, 
+          updates: { notes: action.payload.notes } 
+        });
+        break;
+
+      case 'SEND_TO_KITCHEN':
+        syncManager.broadcast({ type: 'ORDER_SENT_TO_KITCHEN', orderId: action.payload });
+        const order = state.orders.find(o => o.id === action.payload);
+        if (order) {
+          const table = state.tables.find(t => t.id === order.tableId);
+          syncManager.notifyNewOrder(action.payload, table?.name || '?', order.serverName);
+        }
+        break;
+
+      case 'MARK_PREPARING':
+      case 'MARK_READY':
+      case 'MARK_SERVED': {
+        const status = action.type === 'MARK_PREPARING' ? 'preparing' : 
+                       action.type === 'MARK_READY' ? 'ready' : 'served';
+        syncManager.broadcast({ 
+          type: 'ITEM_STATUS_CHANGED', 
+          orderId: action.payload.orderId, 
+          itemId: action.payload.itemId, 
+          status 
+        });
+        if (status === 'ready') {
+          const order = state.orders.find(o => o.id === action.payload.orderId);
+          if (order) {
+            const table = state.tables.find(t => t.id === order.tableId);
+            syncManager.notifyOrderReady(action.payload.orderId, table?.name || '?');
+          }
+        }
+        break;
+      }
+
+      case 'PROCESS_PAYMENT':
+        syncManager.broadcast({ 
+          type: 'PAYMENT_PROCESSED', 
+          orderId: action.payload.orderId, 
+          method: action.payload.method, 
+          amount: action.payload.amount 
+        });
+        break;
+
+      case 'CLOSE_ORDER':
+        syncManager.broadcast({ type: 'ORDER_CLOSED', orderId: action.payload });
+        const closedOrder = state.orders.find(o => o.id === action.payload);
+        if (closedOrder) {
+          syncManager.broadcast({ type: 'TABLE_STATUS_CHANGED', tableId: closedOrder.tableId, status: 'free' });
+        }
+        break;
+
+      case 'SET_TABLE_STATUS':
+        syncManager.broadcast({ 
+          type: 'TABLE_STATUS_CHANGED', 
+          tableId: action.payload.tableId, 
+          status: action.payload.status 
+        });
+        break;
+    }
+  }, [state]);
+
+  // Initialiser la synchronisation quand le type de poste change
+  useEffect(() => {
+    if (state.screen === 'main' || state.screen === 'kitchen' || state.screen === 'server') {
+      const postType = state.screen as 'main' | 'kitchen' | 'server';
+      const serverName = state.currentServer?.name || '';
+      syncManager.initialize(postType, serverName);
+    }
+  }, [state.screen, state.currentServer]);
+
+  // Surveiller les changements et broadcaster
+  const prevOrdersRef = React.useRef<Order[]>([]);
+  useEffect(() => {
+    const prevOrders = prevOrdersRef.current;
+    const currentOrders = state.orders;
+
+    // Détecter les nouveaux ordres
+    currentOrders.forEach(order => {
+      const prevOrder = prevOrders.find(o => o.id === order.id);
+      if (!prevOrder) {
+        // Nouvel ordre créé
+        syncManager.broadcast({ type: 'ORDER_CREATED', order });
+      } else {
+        // Détecter les changements
+        if (JSON.stringify(prevOrder.items) !== JSON.stringify(order.items)) {
+          syncManager.broadcast({ type: 'ORDER_UPDATED', order });
+        }
+        if (prevOrder.status !== order.status && order.status === 'closed') {
+          syncManager.broadcast({ type: 'ORDER_CLOSED', orderId: order.id });
+        }
+      }
+    });
+
+    prevOrdersRef.current = currentOrders;
+  }, [state.orders]);
+
+  // Écouter les événements de synchronisation
+  useEffect(() => {
+    const unsubs: (() => void)[] = [];
+
+    unsubs.push(syncManager.on('ORDER_CREATED', (event: any) => {
+      dispatch({ type: 'SYNC_ADD_ORDER', payload: event.order });
+    }));
+
+    unsubs.push(syncManager.on('ORDER_UPDATED', (event: any) => {
+      dispatch({ type: 'SYNC_UPDATE_ORDER', payload: event.order });
+    }));
+
+    unsubs.push(syncManager.on('ORDER_CLOSED', (event: any) => {
+      dispatch({ type: 'SYNC_CLOSE_ORDER', payload: event.orderId });
+    }));
+
+    unsubs.push(syncManager.on('ITEM_ADDED', (event: any) => {
+      dispatch({ type: 'SYNC_ADD_ITEM', payload: { orderId: event.orderId, item: event.item } });
+    }));
+
+    unsubs.push(syncManager.on('ITEM_REMOVED', (event: any) => {
+      dispatch({ type: 'SYNC_REMOVE_ITEM', payload: { orderId: event.orderId, itemId: event.itemId } });
+    }));
+
+    unsubs.push(syncManager.on('ITEM_UPDATED', (event: any) => {
+      dispatch({ type: 'SYNC_UPDATE_ITEM', payload: { 
+        orderId: event.orderId, 
+        itemId: event.itemId, 
+        updates: event.updates 
+      }});
+    }));
+
+    unsubs.push(syncManager.on('ORDER_SENT_TO_KITCHEN', (event: any) => {
+      dispatch({ type: 'SYNC_SEND_TO_KITCHEN', payload: event.orderId });
+    }));
+
+    unsubs.push(syncManager.on('ITEM_STATUS_CHANGED', (event: any) => {
+      dispatch({ type: 'SYNC_ITEM_STATUS', payload: { 
+        orderId: event.orderId, 
+        itemId: event.itemId, 
+        status: event.status 
+      }});
+    }));
+
+    unsubs.push(syncManager.on('TABLE_STATUS_CHANGED', (event: any) => {
+      dispatch({ type: 'SYNC_TABLE_STATUS', payload: { 
+        tableId: event.tableId, 
+        status: event.status 
+      }});
+    }));
+
+    unsubs.push(syncManager.on('PAYMENT_PROCESSED', (event: any) => {
+      dispatch({ type: 'SYNC_PAYMENT', payload: { 
+        orderId: event.orderId, 
+        method: event.method, 
+        amount: event.amount 
+      }});
+    }));
+
+    return () => {
+      unsubs.forEach(unsub => unsub());
+    };
+  }, []);
+
   return (
-    <POSContext.Provider value={{ state, dispatch }}>
+    <POSContext.Provider value={{ state, dispatch: syncDispatch }}>
       {children}
     </POSContext.Provider>
   );
