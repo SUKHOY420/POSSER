@@ -55,6 +55,8 @@ export interface Table {
   seats: number;
   status: 'free' | 'occupied' | 'reserved' | 'cleaning';
   currentOrderId?: string;
+  paymentStatus?: 'unpaid' | 'partial' | 'paid';
+  paidAmount?: number;
 }
 
 export interface Server {

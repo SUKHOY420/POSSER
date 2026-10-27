@@ -6,6 +6,7 @@ import { categories, menuItems } from '../data';
 import { MenuItem, OrderItem } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { usePrinter, usePaymentTerminal } from '../lib/hooks';
+import { PaymentModal } from './PaymentModal';
 
 export default function ServerScreen() {
   const { state, dispatch } = usePOS();
@@ -25,6 +26,7 @@ export default function ServerScreen() {
   const [paymentProcessing, setPaymentProcessing] = useState(false);
   const [paymentResult, setPaymentResult] = useState<{ success: boolean; message: string } | null>(null);
   const [sendingToKitchen, setSendingToKitchen] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   const server = state.currentServer;
   const currentOrder = state.orders.find(o => o.id === state.currentOrderId);
@@ -96,7 +98,7 @@ export default function ServerScreen() {
           });
           
           // Enregistrer le paiement
-          dispatch({ type: 'PROCESS_PAYMENT', payload: { orderId: state.currentOrderId, method: 'card', amount: currentOrder.total } });
+          dispatch({ type: 'ADD_PAYMENT', payload: { orderId: state.currentOrderId, method: 'card', amount: currentOrder.total } });
           
           // Imprimer le ticket
           await printReceipt(currentOrder, currentTable);
@@ -119,7 +121,7 @@ export default function ServerScreen() {
         }
       } else {
         // Espèces - pas besoin de TPE
-        dispatch({ type: 'PROCESS_PAYMENT', payload: { orderId: state.currentOrderId, method: 'cash', amount: currentOrder.total } });
+        dispatch({ type: 'ADD_PAYMENT', payload: { orderId: state.currentOrderId, method: 'cash', amount: currentOrder.total } });
         
         // Imprimer le ticket
         await printReceipt(currentOrder, currentTable);
@@ -158,7 +160,17 @@ export default function ServerScreen() {
     }
   };
 
-  const getTableColor = (status: string) => {
+  const getTableColor = (status: string, paymentStatus?: string) => {
+    // Si la table est occupée, utiliser le statut de paiement pour la couleur
+    if (status === 'occupied' && paymentStatus) {
+      switch (paymentStatus) {
+        case 'paid': return 'from-green-500/20 to-green-600/10 border-green-500/50';
+        case 'partial': return 'from-orange-500/20 to-orange-600/10 border-orange-500/50';
+        case 'unpaid': return 'from-red-500/20 to-red-600/10 border-red-500/50';
+        default: return 'from-red-500/20 to-red-600/10 border-red-500/50';
+      }
+    }
+    
     switch (status) {
       case 'free': return 'from-emerald-500/20 to-emerald-600/10 border-emerald-500/50';
       case 'occupied': return 'from-red-500/20 to-red-600/10 border-red-500/50';
@@ -203,13 +215,17 @@ export default function ServerScreen() {
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
             {state.tables.map(table => {
               const order = state.orders.find(o => o.tableId === table.id && o.status === 'open');
+              const totalPaid = order?.payments.reduce((sum, p) => sum + p.amount, 0) || 0;
+              const isPartiallyPaid = order && totalPaid > 0 && totalPaid < order.total;
+              const isFullyPaid = order && totalPaid >= order.total;
+              
               return (
                 <motion.button
                   key={table.id}
                   whileTap={{ scale: 0.93 }}
                   onClick={() => handleTableClick(table.id)}
-                  className={`aspect-square rounded-2xl border-2 bg-gradient-to-br ${getTableColor(table.status)} 
-                    flex flex-col items-center justify-center gap-1 p-3 transition-all`}
+                  className={`aspect-square rounded-2xl border-2 bg-gradient-to-br ${getTableColor(table.status, table.paymentStatus)} 
+                    flex flex-col items-center justify-center gap-1 p-3 transition-all relative`}
                 >
                   <span className="text-xl font-bold text-white">{table.name}</span>
                   <span className="text-xs text-slate-400">{table.seats}p</span>
@@ -217,10 +233,33 @@ export default function ServerScreen() {
                     <div className="mt-1 text-center">
                       <p className="text-xs font-bold text-emerald-400">{order.total.toFixed(2)}€</p>
                       <p className="text-[10px] text-slate-400">{order.items.length} art.</p>
+                      {isPartiallyPaid && (
+                        <p className="text-[10px] text-orange-400 font-medium">
+                          {totalPaid.toFixed(2)}€ payés
+                        </p>
+                      )}
+                      {isFullyPaid && (
+                        <p className="text-[10px] text-green-400 font-medium">
+                          ✓ Payé
+                        </p>
+                      )}
                     </div>
                   )}
+                  {/* Indicateur de commande en attente */}
                   {table.status === 'occupied' && order && order.items.some(i => i.status === 'pending') && (
                     <div className="absolute top-2 right-2 w-2.5 h-2.5 bg-amber-500 rounded-full animate-pulse" />
+                  )}
+                  {/* Indicateur de paiement partiel */}
+                  {isPartiallyPaid && (
+                    <div className="absolute top-2 left-2 px-1.5 py-0.5 bg-orange-500/80 rounded text-[9px] font-bold text-white">
+                      PARTIEL
+                    </div>
+                  )}
+                  {/* Indicateur de paiement complet */}
+                  {isFullyPaid && (
+                    <div className="absolute top-2 left-2 px-1.5 py-0.5 bg-green-500/80 rounded text-[9px] font-bold text-white">
+                      PAYÉ
+                    </div>
                   )}
                 </motion.button>
               );
@@ -419,17 +458,46 @@ export default function ServerScreen() {
 
         {/* Total & Pay */}
         <div className="p-3 border-t border-slate-700/50 bg-slate-800/50 shrink-0">
-          <div className="flex justify-between items-center mb-3">
+          <div className="flex justify-between items-center mb-2">
             <span className="text-slate-400 text-sm">Total</span>
             <span className="text-xl font-bold text-emerald-400">{currentOrder.total.toFixed(2)} €</span>
           </div>
+          {currentOrder.payments.length > 0 && (
+            <div className="flex justify-between items-center mb-2 text-xs">
+              <span className="text-slate-400">Payé</span>
+              <span className="text-green-400 font-medium">
+                {currentOrder.payments.reduce((sum, p) => sum + p.amount, 0).toFixed(2)} €
+              </span>
+            </div>
+          )}
+          {currentOrder.payments.length > 0 && currentOrder.payments.reduce((sum, p) => sum + p.amount, 0) < currentOrder.total && (
+            <div className="flex justify-between items-center mb-2 text-xs">
+              <span className="text-slate-400">Reste</span>
+              <span className="text-orange-400 font-medium">
+                {(currentOrder.total - currentOrder.payments.reduce((sum, p) => sum + p.amount, 0)).toFixed(2)} €
+              </span>
+            </div>
+          )}
           <button
-            onClick={() => setShowPayment(true)}
+            onClick={() => setShowPaymentModal(true)}
             disabled={currentOrder.items.length === 0}
             className="w-full py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 disabled:from-slate-600 disabled:to-slate-700 disabled:text-slate-400 text-white rounded-xl font-bold text-base active:scale-[0.98] transition-all"
           >
-            Encaisser • {currentOrder.total.toFixed(2)} €
+            {currentOrder.payments.length > 0 ? 'Paiement partiel' : 'Encaisser'}
           </button>
+          {currentOrder.payments.length > 0 && currentOrder.payments.reduce((sum, p) => sum + p.amount, 0) >= currentOrder.total && (
+            <button
+              onClick={() => {
+                if (state.currentOrderId) {
+                  dispatch({ type: 'CLOSE_ORDER', payload: state.currentOrderId });
+                  setView('tables');
+                }
+              }}
+              className="w-full py-2 mt-2 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold text-sm active:scale-[0.98] transition-all"
+            >
+              ✓ Fermer la table (tout payé)
+            </button>
+          )}
         </div>
       </div>
 
@@ -575,6 +643,14 @@ export default function ServerScreen() {
             </div>
           </motion.div>
         </motion.div>
+      )}
+
+      {/* Payment Modal (paiement partiel) */}
+      {showPaymentModal && currentOrder && (
+        <PaymentModal
+          order={currentOrder}
+          onClose={() => setShowPaymentModal(false)}
+        />
       )}
     </div>
   );

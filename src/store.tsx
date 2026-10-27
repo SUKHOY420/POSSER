@@ -31,7 +31,7 @@ type Action =
   | { type: 'MARK_READY'; payload: { orderId: string; itemId: string } }
   | { type: 'MARK_SERVED'; payload: { orderId: string; itemId: string } }
   | { type: 'APPLY_DISCOUNT'; payload: { orderId: string; discount: number } }
-  | { type: 'PROCESS_PAYMENT'; payload: { orderId: string; method: 'cash' | 'card'; amount: number } }
+  | { type: 'ADD_PAYMENT'; payload: { orderId: string; amount: number; method: 'cash' | 'card' } }
   | { type: 'CLOSE_ORDER'; payload: string }
   | { type: 'SET_TABLE_STATUS'; payload: { tableId: string; status: Table['status'] } }
   | { type: 'TRANSFER_TABLE'; payload: { fromId: string; toId: string } }
@@ -272,7 +272,7 @@ function reducer(state: State, action: Action): State {
       return { ...state, orders: updatedOrders };
     }
 
-    case 'PROCESS_PAYMENT': {
+    case 'ADD_PAYMENT': {
       const { orderId, method, amount } = action.payload;
       const payment: Payment = {
         id: uuidv4(),
@@ -287,9 +287,27 @@ function reducer(state: State, action: Action): State {
 
       const cashDelta = method === 'cash' ? amount : 0;
 
+      // Mettre à jour le statut de paiement de la table
+      const order = state.orders.find(o => o.id === orderId);
+      let updatedTables = state.tables;
+      if (order) {
+        const totalPaid = order.payments.reduce((sum, p) => sum + p.amount, 0) + amount;
+        const isFullyPaid = totalPaid >= order.total;
+        
+        updatedTables = state.tables.map(t => {
+          if (t.id !== order.tableId) return t;
+          return {
+            ...t,
+            paymentStatus: isFullyPaid ? 'paid' : totalPaid > 0 ? 'partial' : 'unpaid',
+            paidAmount: totalPaid,
+          };
+        });
+      }
+
       return {
         ...state,
         orders: updatedOrders,
+        tables: updatedTables,
         cashBalance: state.cashBalance + cashDelta,
       };
     }
@@ -594,7 +612,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
         break;
       }
 
-      case 'PROCESS_PAYMENT':
+      case 'ADD_PAYMENT':
         syncManager.broadcast('PAYMENT_PROCESSED', action.payload);
         break;
 

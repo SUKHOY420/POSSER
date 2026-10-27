@@ -9,7 +9,7 @@ export default function MainScreen() {
   const { isConnected: printerConnected } = usePrinter();
   const { status: terminalStatus } = usePaymentTerminal();
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [filter, setFilter] = useState<'all' | 'pending' | 'preparing' | 'ready'>('all');
+  const [filter, setFilter] = useState<'all' | 'pending' | 'preparing' | 'ready' | 'partial'>('all');
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -47,6 +47,10 @@ export default function MainScreen() {
     if (filter === 'pending') return status.label === 'En attente';
     if (filter === 'preparing') return status.label === 'En préparation';
     if (filter === 'ready') return status.label === 'Prêt';
+    if (filter === 'partial') {
+      const totalPaid = order.payments.reduce((sum, p) => sum + p.amount, 0);
+      return totalPaid > 0 && totalPaid < order.total;
+    }
     return true;
   });
 
@@ -135,6 +139,10 @@ export default function MainScreen() {
           { id: 'pending', label: 'En attente', count: openOrders.filter(o => getOrderStatus(o).label === 'En attente').length },
           { id: 'preparing', label: 'En cuisine', count: openOrders.filter(o => getOrderStatus(o).label === 'En préparation').length },
           { id: 'ready', label: 'Prêtes', count: openOrders.filter(o => getOrderStatus(o).label === 'Prêt').length },
+          { id: 'partial', label: 'Paiement partiel', count: openOrders.filter(o => {
+            const totalPaid = o.payments.reduce((sum, p) => sum + p.amount, 0);
+            return totalPaid > 0 && totalPaid < o.total;
+          }).length },
         ].map(f => (
           <button
             key={f.id}
@@ -198,12 +206,22 @@ export default function MainScreen() {
                     </div>
                     <div className="text-right">
                       <p className="text-lg font-bold text-emerald-400">{order.total.toFixed(2)} €</p>
+                      {order.payments.length > 0 && (
+                        <p className="text-xs text-green-400">
+                          {order.payments.reduce((sum, p) => sum + p.amount, 0).toFixed(2)} € payés
+                        </p>
+                      )}
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${status.bg} ${status.color}`}>
                         {status.label === 'En attente' && <AlertCircle className="w-3 h-3" />}
                         {status.label === 'En préparation' && <Timer className="w-3 h-3" />}
                         {status.label === 'Prêt' && <CheckCircle2 className="w-3 h-3" />}
                         {status.label}
                       </span>
+                      {order.payments.length > 0 && order.payments.reduce((sum, p) => sum + p.amount, 0) < order.total && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-orange-500/10 border border-orange-500/30 text-orange-400 ml-1">
+                          PARTIEL
+                        </span>
+                      )}
                     </div>
                   </div>
 
