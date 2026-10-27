@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Monitor, ChefHat, Tablet, Settings, Lock, Wine } from 'lucide-react';
+import { Monitor, ChefHat, Tablet, Settings, Lock, Wine, Wifi, WifiOff, Server as ServerIcon } from 'lucide-react';
 import { usePOS } from '../store';
 import { Server } from '../types';
+import { useBackend } from '../hooks';
 
 export default function ScreenSelect() {
   const { dispatch } = usePOS();
+  const { isAvailable: isBackendConnected } = useBackend();
   const [step, setStep] = useState<'role' | 'server' | 'pin'>('role');
   const [selectedServer, setSelectedServer] = useState<Server | null>(null);
   const [pin, setPin] = useState('');
@@ -66,6 +68,26 @@ export default function ScreenSelect() {
           <p className="text-sm text-slate-500 mt-3">
             💡 Ouvrez cette page dans plusieurs onglets pour tester la synchronisation temps réel
           </p>
+          
+          {/* Backend Status Indicator */}
+          <div className="mt-4 flex items-center justify-center gap-2">
+            {isBackendConnected === null ? (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-700/50 border border-slate-600/30">
+                <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                <span className="text-xs text-slate-400">Connexion au serveur...</span>
+              </div>
+            ) : isBackendConnected ? (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30">
+                <Wifi className="w-3 h-3 text-emerald-400" />
+                <span className="text-xs text-emerald-400">Backend connecté</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30">
+                <WifiOff className="w-3 h-3 text-amber-400" />
+                <span className="text-xs text-amber-400">Mode démo (localStorage)</span>
+              </div>
+            )}
+          </div>
         </motion.div>
 
         {step === 'role' && (

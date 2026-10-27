@@ -2,6 +2,17 @@
 
 Système de caisse multi-postes avec synchronisation temps réel, validation de commande et panneau d'administration complet.
 
+## 🆕 Backend Disponible !
+
+QuickPOS Pro dispose maintenant d'un **backend Node.js complet** avec :
+- ✅ Base de données SQLite
+- ✅ Synchronisation WebSocket temps réel
+- ✅ API REST complète
+- ✅ Persistance des données
+- ✅ Gestion des sessions
+
+👉 **Voir `START_HERE.md` pour démarrer rapidement**
+
 ## 🚀 Fonctionnalités Principales
 
 ### 1. **Workflow de Validation de Commande**
