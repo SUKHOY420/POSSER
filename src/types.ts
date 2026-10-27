@@ -1,3 +1,8 @@
+// ============================================
+// MODÈLE DE DONNÉES PROFESSIONNEL POS
+// Architecture : Tables → Tickets → Items + Payments
+// ============================================
+
 export interface MenuItem {
   id: string;
   name: string;
@@ -16,18 +21,7 @@ export interface Modifier {
   required: boolean;
 }
 
-export interface TicketItem {
-  id: string;
-  menuItem: MenuItem;
-  quantity: number;
-  notes: string;
-  modifiers: Record<string, string>;
-  status: 'pending' | 'sent' | 'preparing' | 'ready' | 'served';
-  sentAt?: Date;
-  readyAt?: Date;
-}
-
-// Un Ticket = une addition. Une table peut avoir plusieurs tickets (paiements séparés)
+// TICKET = Une addition. Une table peut avoir plusieurs tickets (paiements séparés)
 export interface Ticket {
   id: string;
   tableId: string;
@@ -43,6 +37,17 @@ export interface Ticket {
   discount: number;
 }
 
+export interface TicketItem {
+  id: string;
+  menuItem: MenuItem;
+  quantity: number;
+  notes: string;
+  modifiers: Record<string, string>;
+  status: 'pending' | 'sent' | 'preparing' | 'ready' | 'served';
+  sentAt?: Date;
+  readyAt?: Date;
+}
+
 export interface Payment {
   id: string;
   ticketId: string;
@@ -52,6 +57,7 @@ export interface Payment {
   timestamp: Date;
 }
 
+// TABLE avec machine à états
 export interface Table {
   id: string;
   name: string;
@@ -92,7 +98,7 @@ export interface Session {
   serverTotals: Record<string, { name: string; orders: number; revenue: number; cash: number; card: number }>;
 }
 
-// Queue d'actions pour gestion hors-ligne
+// Queue d'actions pour gestion hors-ligne (Optimistic UI)
 export interface PendingAction {
   id: string;
   type: string;
