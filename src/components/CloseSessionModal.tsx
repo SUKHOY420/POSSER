@@ -17,18 +17,17 @@ export default function CloseSessionModal({ onClose }: CloseSessionModalProps) {
     return null;
   }
 
-  // Calculer les statistiques de la session
+  // ✅ CORRECTION #2: Utiliser createdAt pour cohérence avec le store
   const sessionTickets = state.tickets.filter(t => 
-    t.status === 'PAID' && 
-    t.closedAt && 
-    new Date(t.closedAt) >= state.currentSession!.openedAt
+    new Date(t.createdAt) >= state.currentSession!.openedAt
   );
 
-  const totalRevenue = sessionTickets.reduce((sum, t) => sum + t.paidAmount, 0);
-  const totalCash = sessionTickets.reduce((sum, t) => 
+  const paidTickets = sessionTickets.filter(t => t.status === 'PAID');
+  const totalRevenue = paidTickets.reduce((sum, t) => sum + t.paidAmount, 0);
+  const totalCash = paidTickets.reduce((sum, t) => 
     sum + t.payments.filter(p => p.method === 'CASH').reduce((s, p) => s + p.amount, 0), 0
   );
-  const totalCard = sessionTickets.reduce((sum, t) => 
+  const totalCard = paidTickets.reduce((sum, t) => 
     sum + t.payments.filter(p => p.method === 'CARD').reduce((s, p) => s + p.amount, 0), 0
   );
 

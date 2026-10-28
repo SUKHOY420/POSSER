@@ -29,7 +29,12 @@ export default function ServerScreen() {
     return matchCat && matchSearch;
   });
 
+  // ✅ CORRECTION #6: Vérifier qu'une session est ouverte avant de prendre une commande
   const handleTableClick = (tableId: string) => {
+    if (!state.currentSession) {
+      alert('⚠️ Veuillez ouvrir une session avant de prendre des commandes');
+      return;
+    }
     dispatch({ type: 'OPEN_TABLE', payload: tableId });
     setView('order');
   };

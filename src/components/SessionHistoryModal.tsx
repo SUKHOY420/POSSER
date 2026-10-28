@@ -27,7 +27,23 @@ export default function SessionHistoryModal({ onClose }: SessionHistoryModalProp
     new Date(s.closedAt || s.openedAt).getMonth() === selectedMonth
   );
 
-  // Calculer les statistiques mensuelles
+  // ✅ CORRECTION #7: Inclure les tickets de la session courante dans les statistiques
+  const currentSessionTickets = state.currentSession 
+    ? state.tickets.filter(t => 
+        t.status === 'PAID' && 
+        new Date(t.createdAt) >= state.currentSession!.openedAt
+      )
+    : [];
+
+  const currentSessionRevenue = currentSessionTickets.reduce((sum, t) => sum + t.paidAmount, 0);
+  const currentSessionCash = currentSessionTickets.reduce((sum, t) => 
+    sum + t.payments.filter(p => p.method === 'CASH').reduce((s, p) => s + p.amount, 0), 0
+  );
+  const currentSessionCard = currentSessionTickets.reduce((sum, t) => 
+    sum + t.payments.filter(p => p.method === 'CARD').reduce((s, p) => s + p.amount, 0), 0
+  );
+
+  // Calculer les statistiques mensuelles (incluant session courante)
   const monthlyStats = sessionsByMonth.reduce((acc, session) => {
     acc.totalRevenue += session.totalRevenue;
     acc.totalCash += session.totalCash;
@@ -35,7 +51,13 @@ export default function SessionHistoryModal({ onClose }: SessionHistoryModalProp
     acc.ticketCount += session.ticketCount;
     acc.sessionCount++;
     return acc;
-  }, { totalRevenue: 0, totalCash: 0, totalCard: 0, ticketCount: 0, sessionCount: 0 });
+  }, { 
+    totalRevenue: currentSessionRevenue, // ✅ Inclure session courante
+    totalCash: currentSessionCash,
+    totalCard: currentSessionCard,
+    ticketCount: currentSessionTickets.length,
+    sessionCount: state.currentSession ? 1 : 0 // ✅ Compter session courante
+  });
 
   // Calculer les statistiques annuelles
   const annualStats = sessionsByYear.reduce((acc, session) => {

@@ -15,11 +15,18 @@ export default function ReportPrinterModal({ onClose }: ReportPrinterModalProps)
   // Filtrer les tickets payés
   const paidTickets = state.tickets.filter(t => t.status === 'PAID');
 
-  // Calculer les statistiques selon le type de rapport
+  // ✅ CORRECTION #5: Rapport journalier basé sur la session courante
   const getFilteredTickets = () => {
     const now = new Date();
     
     if (reportType === 'daily') {
+      // ✅ Utiliser la session courante si disponible
+      if (state.currentSession) {
+        return paidTickets.filter(t => 
+          new Date(t.createdAt) >= state.currentSession!.openedAt
+        );
+      }
+      // Fallback sur la date calendrier
       return paidTickets.filter(t => {
         const ticketDate = new Date(t.closedAt || t.createdAt);
         return ticketDate.toDateString() === now.toDateString();

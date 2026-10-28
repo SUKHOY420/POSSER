@@ -54,6 +54,7 @@ export const syncManager = new SyncManager();
 // ============================================
 // MACHINE À ÉTATS - recalculateTableStatus
 // ============================================
+// ✅ CORRECTION #3: Amélioration de la logique de statut de table
 export function recalculateTableStatus(
   tableId: string,
   tickets: Ticket[],
@@ -77,6 +78,9 @@ export function recalculateTableStatus(
     newStatus = 'FREE';
   } else if (!hasOpenTickets && totalPaid >= totalToPay && totalToPay > 0) {
     newStatus = 'FREE';
+  } else if (!hasOpenTickets && totalPaid > 0 && totalPaid < totalToPay) {
+    // ✅ NOUVEAU: Cas où tous les tickets sont fermés mais paiement partiel
+    newStatus = 'PARTIALLY_PAID';
   } else if (totalPaid > 0 && totalPaid < totalToPay) {
     newStatus = 'PARTIALLY_PAID';
   } else if (hasOpenTickets && totalPaid === 0) {
@@ -208,7 +212,9 @@ type Action =
   | { type: 'UPDATE_TICKET_FORMAT'; payload: TicketFormat }
   // Sync actions
   | { type: 'SYNC_TICKET'; payload: Ticket }
-  | { type: 'SYNC_TABLE'; payload: Table };
+  | { type: 'SYNC_TABLE'; payload: Table }
+  | { type: 'SYNC_SESSION_OPEN'; payload: Session }
+  | { type: 'SYNC_SESSION_CLOSED'; payload: Session };
 
 function calcTicketTotal(items: TicketItem[], discount: number): number {
   const subtotal = items.reduce((sum, i) => sum + i.menuItem.price * i.quantity, 0);
@@ -353,8 +359,28 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, tickets };
     }
 
+    // ✅ CORRECTION #8: Validation des montants de paiement
     case 'ADD_PAYMENT': {
       const { ticketId, amount, method } = action.payload;
+      
+      // Validation du montant
+      if (amount <= 0) {
+        console.error('Montant de paiement invalide:', amount);
+        return state;
+      }
+      
+      const ticket = state.tickets.find(t => t.id === ticketId);
+      if (!ticket) {
+        console.error('Ticket non trouvé:', ticketId);
+        return state;
+      }
+      
+      const remaining = ticket.totalAmount - ticket.paidAmount;
+      if (amount > remaining + 0.01) { // Tolérance de 1 centime pour les arrondis
+        console.error('Montant supérieur au reste à payer:', amount, '>', remaining);
+        return state;
+      }
+      
       const payment: Payment = {
         id: uuidv4(),
         ticketId,
@@ -375,10 +401,10 @@ function reducer(state: AppState, action: Action): AppState {
           closedAt: isFullyPaid ? new Date() : undefined,
         };
       });
-      const ticket = tickets.find(t => t.id === ticketId)!;
-      const { status, totalToPay, totalPaid } = recalculateTableStatus(ticket.tableId, tickets, 'PARTIALLY_PAID');
+      const updatedTicket = tickets.find(t => t.id === ticketId)!;
+      const { status, totalToPay, totalPaid } = recalculateTableStatus(updatedTicket.tableId, tickets, 'PARTIALLY_PAID');
       const tables = state.tables.map(t =>
-        t.id === ticket.tableId ? { ...t, status, totalToPay, totalPaid } : t
+        t.id === updatedTicket.tableId ? { ...t, status, totalToPay, totalPaid } : t
       );
       const cashDelta = method === 'CASH' ? amount : 0;
       return {
@@ -524,13 +550,37 @@ function reducer(state: AppState, action: Action): AppState {
     case 'UPDATE_TICKET_FORMAT':
       return { ...state, ticketFormat: action.payload };
 
-    // Sync actions
+    // ✅ CORRECTION #10: Gestion des conflits de synchronisation
     case 'SYNC_TICKET': {
       const newTicket = action.payload;
-      const exists = state.tickets.find(t => t.id === newTicket.id);
-      let tickets = exists
-        ? state.tickets.map(t => t.id === newTicket.id ? newTicket : t)
-        : [...state.tickets, newTicket];
+      const existingTicket = state.tickets.find(t => t.id === newTicket.id);
+      let tickets;
+      
+      if (existingTicket) {
+        // Vérifier les timestamps pour résoudre les conflits
+        const existingTime = new Date(existingTicket.createdAt).getTime();
+        const newTime = new Date(newTicket.createdAt).getTime();
+        
+        // Si le nouveau ticket est plus récent ou a des paiements plus récents, on l'accepte
+        const existingLastPayment = existingTicket.payments.length > 0 
+          ? Math.max(...existingTicket.payments.map(p => new Date(p.timestamp).getTime()))
+          : existingTime;
+        const newLastPayment = newTicket.payments.length > 0
+          ? Math.max(...newTicket.payments.map(p => new Date(p.timestamp).getTime()))
+          : newTime;
+        
+        if (newLastPayment > existingLastPayment) {
+          // Nouveau ticket plus récent, on l'accepte
+          tickets = state.tickets.map(t => t.id === newTicket.id ? newTicket : t);
+        } else {
+          // Ticket local plus récent, on le garde
+          console.warn('Conflit de synchronisation: ticket local plus récent, ignoré');
+          tickets = state.tickets;
+        }
+      } else {
+        tickets = [...state.tickets, newTicket];
+      }
+      
       const tables = state.tables.map(t => {
         const { status, totalToPay, totalPaid } = recalculateTableStatus(t.id, tickets, t.status);
         return { ...t, status, totalToPay, totalPaid };
@@ -544,6 +594,33 @@ function reducer(state: AppState, action: Action): AppState {
         ...state,
         tables: state.tables.map(t => t.id === newTable.id ? newTable : t),
       };
+    }
+
+    // ✅ CORRECTION #4: Gestion de la synchronisation des sessions
+    case 'SYNC_SESSION_OPEN': {
+      const session = action.payload;
+      // Accepter la session si on n'en a pas
+      if (!state.currentSession) {
+        return { ...state, currentSession: session };
+      }
+      return state;
+    }
+
+    case 'SYNC_SESSION_CLOSED': {
+      const session = action.payload;
+      // Ajouter la session fermée à l'historique
+      const exists = state.closedSessions.find(s => s.id === session.id);
+      if (!exists) {
+        return {
+          ...state,
+          closedSessions: [...state.closedSessions, session],
+          currentSession: null,
+          tickets: [],
+          tables: initialTables,
+          cashBalance: session.finalCash || state.cashBalance,
+        };
+      }
+      return state;
     }
 
     default:
@@ -658,6 +735,26 @@ export function POSProvider({ children }: { children: ReactNode }) {
         }, 0);
         break;
       }
+      // ✅ CORRECTION #4: Synchronisation des sessions
+      case 'OPEN_SESSION': {
+        setTimeout(() => {
+          const session = stateRef.current.currentSession;
+          if (session) {
+            syncManager.broadcast('SESSION_UPDATE', session);
+          }
+        }, 50);
+        break;
+      }
+      case 'CLOSE_SESSION': {
+        setTimeout(() => {
+          const sessions = stateRef.current.closedSessions;
+          const lastSession = sessions[sessions.length - 1];
+          if (lastSession) {
+            syncManager.broadcast('SESSION_CLOSED', lastSession);
+          }
+        }, 50);
+        break;
+      }
     }
   }, []);
 
@@ -667,6 +764,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
   }, [state.screen]);
 
+  // ✅ CORRECTION #4: Listeners pour la synchronisation des sessions
   useEffect(() => {
     const unsubs = [
       syncManager.on('TICKET_UPDATE', (ticket: Ticket) => {
@@ -674,6 +772,15 @@ export function POSProvider({ children }: { children: ReactNode }) {
       }),
       syncManager.on('TABLE_UPDATE', (table: Table) => {
         dispatch({ type: 'SYNC_TABLE', payload: table });
+      }),
+      syncManager.on('SESSION_UPDATE', (session: Session) => {
+        // Si on reçoit une session d'un autre poste et qu'on n'en a pas, on l'accepte
+        if (!stateRef.current.currentSession) {
+          dispatch({ type: 'SYNC_SESSION_OPEN', payload: session });
+        }
+      }),
+      syncManager.on('SESSION_CLOSED', (session: Session) => {
+        dispatch({ type: 'SYNC_SESSION_CLOSED', payload: session });
       }),
     ];
     return () => unsubs.forEach(u => u());

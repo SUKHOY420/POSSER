@@ -48,7 +48,7 @@ export default function MainScreen() {
 
   const openTickets = state.tickets.filter(t => t.status === 'OPEN' || t.status === 'DRAFT');
   const totalRevenue = state.tickets.filter(t => t.status === 'PAID').reduce((sum, t) => sum + t.paidAmount, 0);
-
+  
   const filteredTables = state.tables.filter(t => {
     if (filter === 'all') return true;
     if (filter === 'occupied') return t.status === 'OCCUPIED';
@@ -56,6 +56,12 @@ export default function MainScreen() {
     return true;
   });
 
+  // ✅ CORRECTION #1: Vérifier que l'utilisateur est connecté
+  useEffect(() => {
+    if (!state.currentServer && state.screen === 'main') {
+      dispatch({ type: 'SET_SCREEN', payload: 'select' });
+    }
+  }, [state.currentServer, state.screen, dispatch]);
   const handleAdminLogin = () => {
     const adminServer = state.servers.find(s => s.role === 'admin');
     if (adminServer && adminPassword === adminServer.pin) {
@@ -419,9 +425,9 @@ export default function MainScreen() {
         )}
       </AnimatePresence>
 
-      {/* Open Session Modal - Affiché quand pas de session en cours */}
+      {/* ✅ CORRECTION #1: Open Session Modal - Affiché seulement si session ET serveur */}
       <AnimatePresence>
-        {!state.currentSession && (
+        {!state.currentSession && state.currentServer && (
           <OpenSessionModal />
         )}
       </AnimatePresence>
