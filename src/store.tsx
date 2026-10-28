@@ -1,6 +1,6 @@
 import { createContext, useContext, useReducer, ReactNode, useCallback, useRef, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { AppState, Ticket, TicketItem, Table, Server, MenuItem, Payment, TicketFormat, TableStatus } from './types';
+import { AppState, Ticket, TicketItem, Table, Server, MenuItem, Payment, TicketFormat, TableStatus, Session } from './types';
 import { initialServers, initialMenuItems, initialTables } from './data';
 
 // ============================================
@@ -114,6 +114,8 @@ const initialState: AppState = {
   currentTicketId: null,
   cashBalance: 200,
   ticketFormat: defaultTicketFormat,
+  currentSession: null,
+  closedSessions: [],
 };
 
 // ============================================
@@ -164,6 +166,9 @@ type Action =
   | { type: 'MARK_STATUS'; payload: { ticketId: string; itemId: string; status: TicketItem['status'] } }
   | { type: 'ADD_PAYMENT'; payload: { ticketId: string; amount: number; method: 'CASH' | 'CARD' } }
   | { type: 'CLOSE_TICKET'; payload: string }
+  // Session actions
+  | { type: 'OPEN_SESSION'; payload: { initialCash: number } }
+  | { type: 'CLOSE_SESSION'; payload: { finalCash: number; notes?: string } }
   // Admin actions
   | { type: 'ADD_MENU_ITEM'; payload: MenuItem }
   | { type: 'UPDATE_MENU_ITEM'; payload: MenuItem }
@@ -373,6 +378,65 @@ function reducer(state: AppState, action: Action): AppState {
         return { ...t, ticketIds: newTicketIds, status, totalToPay, totalPaid };
       });
       return { ...state, tables, currentTicketId: null };
+    }
+
+    case 'OPEN_SESSION': {
+      const { initialCash } = action.payload;
+      const session: Session = {
+        id: uuidv4(),
+        openedAt: new Date(),
+        openedBy: state.currentServer?.name || 'Unknown',
+        initialCash,
+        totalRevenue: 0,
+        totalCash: 0,
+        totalCard: 0,
+        ticketCount: 0,
+      };
+      return { ...state, currentSession: session, cashBalance: initialCash };
+    }
+
+    case 'CLOSE_SESSION': {
+      if (!state.currentSession) return state;
+      const { finalCash, notes } = action.payload;
+      
+      // Calculer les totaux de la session
+      const sessionTickets = state.tickets.filter(t => 
+        t.status === 'PAID' && 
+        t.closedAt && 
+        new Date(t.closedAt) >= state.currentSession!.openedAt
+      );
+      
+      const totalRevenue = sessionTickets.reduce((sum, t) => sum + t.paidAmount, 0);
+      const totalCash = sessionTickets.reduce((sum, t) => 
+        sum + t.payments.filter(p => p.method === 'CASH').reduce((s, p) => s + p.amount, 0), 0
+      );
+      const totalCard = sessionTickets.reduce((sum, t) => 
+        sum + t.payments.filter(p => p.method === 'CARD').reduce((s, p) => s + p.amount, 0), 0
+      );
+      
+      const closedSession: Session = {
+        ...state.currentSession,
+        closedAt: new Date(),
+        closedBy: state.currentServer?.name || 'Unknown',
+        finalCash,
+        totalRevenue,
+        totalCash,
+        totalCard,
+        ticketCount: sessionTickets.length,
+        notes,
+      };
+      
+      return {
+        ...state,
+        currentSession: null,
+        closedSessions: [...state.closedSessions, closedSession],
+        tickets: [],
+        tables: initialTables,
+        cashBalance: finalCash,
+        currentTicketId: null,
+        screen: 'select',
+        currentServer: null,
+      };
     }
 
     // Admin actions

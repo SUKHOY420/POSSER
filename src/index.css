@@ -652,13 +652,66 @@ button, [role="button"] {
 
 /* Print styles */
 @media print {
-  .no-print {
-    display: none !important;
+  /* Hide everything except printable content */
+  body * {
+    visibility: hidden;
   }
   
-  body {
-    overflow: visible !important;
-    position: static !important;
+  #printable-report,
+  #printable-report * {
+    visibility: visible;
+  }
+  
+  #printable-report {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 20px;
+    background: white !important;
+    color: black !important;
+  }
+  
+  /* Reset styles for print */
+  .glass,
+  .glass-card,
+  .glass-light {
+    background: white !important;
+    backdrop-filter: none !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  
+  /* Ensure text is black for print */
+  .text-white,
+  .text-slate-300,
+  .text-slate-400 {
+    color: black !important;
+  }
+  
+  /* Page breaks */
+  h1, h2, h3 {
+    page-break-after: avoid;
+  }
+  
+  table {
+    page-break-inside: avoid;
+  }
+  
+  /* Remove backgrounds and shadows */
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+  
+  /* Ensure proper margins */
+  @page {
+    margin: 1cm;
+  }
+  
+  /* Hide scrollbars */
+  ::-webkit-scrollbar {
+    display: none;
   }
 }
 

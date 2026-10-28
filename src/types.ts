@@ -84,6 +84,21 @@ export interface TicketFormat {
   footerText: string;
 }
 
+export interface Session {
+  id: string;
+  openedAt: Date;
+  closedAt?: Date;
+  openedBy: string;
+  closedBy?: string;
+  initialCash: number;
+  finalCash?: number;
+  totalRevenue: number;
+  totalCash: number;
+  totalCard: number;
+  ticketCount: number;
+  notes?: string;
+}
+
 export interface AppState {
   screen: ScreenType;
   tables: Table[];
@@ -94,4 +109,6 @@ export interface AppState {
   currentTicketId: string | null;
   cashBalance: number;
   ticketFormat: TicketFormat;
+  currentSession: Session | null;
+  closedSessions: Session[];
 }

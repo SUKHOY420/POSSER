@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Clock, Users, DollarSign, LogOut, ChefHat, AlertCircle, CheckCircle2, Timer, Settings, Lock, Eye, History, CreditCard } from 'lucide-react';
+import { Clock, Users, DollarSign, LogOut, ChefHat, AlertCircle, CheckCircle2, Timer, Settings, Lock, Eye, History, CreditCard, FileText, Power } from 'lucide-react';
 import { usePOS } from '../store';
 import { Ticket } from '../types';
 import TicketDetailModal from './TicketDetailModal';
 import TicketHistoryModal from './TicketHistoryModal';
 import EmergencyPaymentModal from './EmergencyPaymentModal';
+import ReportPrinterModal from './ReportPrinterModal';
+import CloseSessionModal from './CloseSessionModal';
 
 export default function MainScreen() {
   const { state, dispatch } = usePOS();
@@ -20,6 +22,8 @@ export default function MainScreen() {
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [showHistory, setShowHistory] = useState<{ type: 'table' | 'server'; id: string; name: string } | null>(null);
   const [emergencyTicket, setEmergencyTicket] = useState<Ticket | null>(null);
+  const [showReportPrinter, setShowReportPrinter] = useState(false);
+  const [showCloseSession, setShowCloseSession] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -99,6 +103,24 @@ export default function MainScreen() {
               </p>
             )}
           </div>
+          <motion.button 
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => setShowReportPrinter(true)}
+            className="p-2 text-slate-400 hover:text-blue-400 touch-target transition-colors"
+            title="Imprimer rapport"
+          >
+            <FileText className="w-5 h-5" />
+          </motion.button>
+          <motion.button 
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => setShowCloseSession(true)}
+            className="p-2 text-slate-400 hover:text-red-400 touch-target transition-colors"
+            title="Clôturer la session"
+          >
+            <Power className="w-5 h-5" />
+          </motion.button>
           <motion.button 
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
@@ -361,6 +383,20 @@ export default function MainScreen() {
             ticket={emergencyTicket}
             onClose={() => setEmergencyTicket(null)}
           />
+        )}
+      </AnimatePresence>
+
+      {/* Report Printer Modal */}
+      <AnimatePresence>
+        {showReportPrinter && (
+          <ReportPrinterModal onClose={() => setShowReportPrinter(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* Close Session Modal */}
+      <AnimatePresence>
+        {showCloseSession && (
+          <CloseSessionModal onClose={() => setShowCloseSession(false)} />
         )}
       </AnimatePresence>
     </div>
