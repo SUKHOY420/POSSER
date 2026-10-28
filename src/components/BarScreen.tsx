@@ -64,9 +64,9 @@ export default function BarScreen() {
   };
 
   return (
-    <div className="h-screen flex flex-col gradient-dark">
+    <div className="h-screen-safe w-screen flex flex-col gradient-dark overflow-hidden">
       {/* Header */}
-      <header className={`h-16 md:h-20 border-b flex items-center justify-between px-4 md:px-6 shrink-0 transition-all ${
+      <header className={`h-16 md:h-20 border-b flex items-center justify-between px-4 md:px-6 shrink-0 transition-all overflow-hidden ${
         alert ? 'bg-gradient-to-r from-purple-900/70 to-blue-900/70 border-purple-500/50 animate-pulse-custom' : 'glass border-white/10'
       }`}>
         <div className="flex items-center gap-3">

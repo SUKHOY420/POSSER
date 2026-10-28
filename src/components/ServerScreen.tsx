@@ -73,8 +73,8 @@ export default function ServerScreen() {
   // View tables
   if (view === 'tables' || !currentTicket) {
     return (
-      <div className="h-screen flex flex-col gradient-dark">
-        <header className="h-16 glass border-b border-white/10 flex items-center justify-between px-4 shrink-0 shadow-lg">
+      <div className="h-screen-safe w-screen flex flex-col gradient-dark overflow-hidden">
+        <header className="h-16 glass border-b border-white/10 flex items-center justify-between px-4 shrink-0 shadow-lg overflow-hidden">
           <div className="flex items-center gap-3">
             <motion.div 
               whileHover={{ scale: 1.1 }}
@@ -151,10 +151,10 @@ export default function ServerScreen() {
 
   // View order (DRAFT)
   return (
-    <div className="h-screen flex flex-col md:flex-row gradient-dark">
+    <div className="h-screen-safe w-screen flex flex-col md:flex-row gradient-dark overflow-hidden">
       {/* Menu */}
-      <div className="flex-1 flex flex-col h-[55vh] md:h-full border-r border-white/10">
-        <div className="p-3 md:p-4 border-b border-white/10 glass shrink-0">
+      <div className="flex-1 flex flex-col h-[55vh] md:h-full border-r border-white/10 overflow-hidden">
+        <div className="p-3 md:p-4 border-b border-white/10 glass shrink-0 overflow-hidden">
           <div className="flex items-center justify-between mb-3">
             <motion.button 
               whileHover={{ x: -3 }}

@@ -1,6 +1,30 @@
 @import "tailwindcss";
 
 /* ============================================
+   GLOBAL RESET & OVERFLOW PREVENTION
+   ============================================ */
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+/* Prevent horizontal overflow globally */
+body {
+  overflow-x: hidden;
+  position: fixed;
+  width: 100%;
+}
+
+/* ============================================
    MODERN CSS - QuickPOS Pro
    ============================================ */
 
@@ -469,4 +493,199 @@ button, [role="button"] {
 
 .hover-glow:hover {
   box-shadow: 0 0 20px rgba(99, 102, 241, 0.5);
+}
+
+/* ============================================
+   OVERFLOW & RESPONSIVE UTILITIES
+   ============================================ */
+
+/* Prevent all overflow */
+.no-overflow {
+  overflow: hidden !important;
+}
+
+.no-overflow-x {
+  overflow-x: hidden !important;
+}
+
+.no-overflow-y {
+  overflow-y: hidden !important;
+}
+
+/* Safe overflow with scroll */
+.safe-overflow {
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.safe-overflow-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.safe-overflow-y {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Full height containers */
+.h-screen-safe {
+  height: 100vh;
+  height: 100dvh; /* Dynamic viewport height for mobile */
+}
+
+.min-h-screen-safe {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+/* Flex layouts that prevent overflow */
+.flex-no-overflow {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.flex-scroll {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.flex-scroll > .flex-scroll-content {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Grid responsive */
+.grid-responsive {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+}
+
+.grid-responsive-sm {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.grid-responsive-lg {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+}
+
+/* Text overflow prevention */
+.text-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.text-break {
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Container responsive */
+.container-responsive {
+  width: 100%;
+  max-width: 100%;
+  padding: 1rem;
+  overflow-x: hidden;
+}
+
+@media (min-width: 640px) {
+  .container-responsive {
+    padding: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .container-responsive {
+    padding: 2rem;
+  }
+}
+
+/* Modal overlay */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 1rem;
+  overflow-y: auto;
+}
+
+.modal-content {
+  max-width: 100%;
+  max-height: calc(100vh - 2rem);
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+}
+
+/* Touch-friendly improvements */
+@media (max-width: 768px) {
+  /* Larger touch targets on mobile */
+  button, a, [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Reduce animations on mobile for performance */
+  .hover-lift:hover {
+    transform: none;
+  }
+
+  .hover-scale:hover {
+    transform: none;
+  }
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  body {
+    overflow: visible !important;
+    position: static !important;
+  }
+}
+
+/* Accessibility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Focus visible for keyboard navigation */
+:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

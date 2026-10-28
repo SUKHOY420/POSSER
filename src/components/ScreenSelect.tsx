@@ -57,8 +57,8 @@ export default function ScreenSelect() {
   };
 
   return (
-    <div className="h-screen w-screen gradient-dark flex items-center justify-center p-4 container-responsive">
-      <div className="w-full max-w-lg">
+    <div className="h-screen-safe w-screen gradient-dark flex items-center justify-center p-4 container-responsive overflow-hidden">
+      <div className="w-full max-w-lg overflow-y-auto max-h-[calc(100vh-2rem)]">
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-8">
           <div className="w-20 h-20 mx-auto rounded-2xl gradient-primary flex items-center justify-center mb-4 shadow-2xl animate-glow">
             <Monitor className="w-10 h-10 text-white" />

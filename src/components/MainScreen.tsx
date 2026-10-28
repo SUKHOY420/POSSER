@@ -66,9 +66,9 @@ export default function MainScreen() {
   };
 
   return (
-    <div className="h-screen flex flex-col gradient-dark">
+    <div className="h-screen-safe w-screen flex flex-col gradient-dark overflow-hidden">
       {/* Header */}
-      <header className="h-16 glass border-b border-white/10 flex items-center justify-between px-4 md:px-6 shrink-0 shadow-lg">
+      <header className="h-16 glass border-b border-white/10 flex items-center justify-between px-4 md:px-6 shrink-0 shadow-lg overflow-hidden">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-lg animate-glow">
             <DollarSign className="w-5 h-5 text-white" />

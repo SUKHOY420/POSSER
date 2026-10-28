@@ -23,9 +23,9 @@ export default function AdminPanel() {
   ];
 
   return (
-    <div className="h-screen flex flex-col bg-slate-900">
+    <div className="h-screen-safe w-screen flex flex-col bg-slate-900 overflow-hidden">
       {/* Header */}
-      <header className="h-16 bg-slate-800/90 border-b border-slate-700/50 flex items-center justify-between px-4 md:px-6 shrink-0">
+      <header className="h-16 bg-slate-800/90 border-b border-slate-700/50 flex items-center justify-between px-4 md:px-6 shrink-0 overflow-hidden">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center">
             <Settings className="w-4 h-4 text-white" />
