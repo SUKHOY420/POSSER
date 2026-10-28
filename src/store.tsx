@@ -123,6 +123,32 @@ const initialState: AppState = {
 // ============================================
 const loadState = (): AppState => {
   const saved = localStorage.getItem('quickpos-state');
+  const savedSessions = localStorage.getItem('quickpos-sessions');
+  
+  let closedSessions: Session[] = [];
+  if (savedSessions) {
+    try {
+      const parsed = JSON.parse(savedSessions);
+      closedSessions = parsed.map((s: any) => ({
+        ...s,
+        openedAt: new Date(s.openedAt),
+        closedAt: s.closedAt ? new Date(s.closedAt) : undefined,
+        tickets: s.tickets.map((t: any) => ({
+          ...t,
+          createdAt: new Date(t.createdAt),
+          validatedAt: t.validatedAt ? new Date(t.validatedAt) : undefined,
+          closedAt: t.closedAt ? new Date(t.closedAt) : undefined,
+          payments: t.payments.map((p: any) => ({
+            ...p,
+            timestamp: new Date(p.timestamp)
+          }))
+        }))
+      }));
+    } catch (e) {
+      console.error('Error loading sessions:', e);
+    }
+  }
+  
   if (saved) {
     try {
       const parsed = JSON.parse(saved);
@@ -137,12 +163,12 @@ const loadState = (): AppState => {
           timestamp: new Date(p.timestamp)
         }))
       }));
-      return { ...initialState, ...parsed };
+      return { ...initialState, ...parsed, closedSessions };
     } catch (e) {
       console.error('Error loading state:', e);
     }
   }
-  return initialState;
+  return { ...initialState, closedSessions };
 };
 
 const saveState = (state: AppState) => {
@@ -391,6 +417,7 @@ function reducer(state: AppState, action: Action): AppState {
         totalCash: 0,
         totalCard: 0,
         ticketCount: 0,
+        tickets: [], // Historique vide au début
       };
       return { ...state, currentSession: session, cashBalance: initialCash };
     }
@@ -399,18 +426,18 @@ function reducer(state: AppState, action: Action): AppState {
       if (!state.currentSession) return state;
       const { finalCash, notes } = action.payload;
       
-      // Calculer les totaux de la session
+      // Récupérer TOUS les tickets de la session (payés et annulés)
       const sessionTickets = state.tickets.filter(t => 
-        t.status === 'PAID' && 
-        t.closedAt && 
-        new Date(t.closedAt) >= state.currentSession!.openedAt
+        new Date(t.createdAt) >= state.currentSession!.openedAt
       );
       
-      const totalRevenue = sessionTickets.reduce((sum, t) => sum + t.paidAmount, 0);
-      const totalCash = sessionTickets.reduce((sum, t) => 
+      // Calculer les totaux de la session
+      const paidTickets = sessionTickets.filter(t => t.status === 'PAID');
+      const totalRevenue = paidTickets.reduce((sum, t) => sum + t.paidAmount, 0);
+      const totalCash = paidTickets.reduce((sum, t) => 
         sum + t.payments.filter(p => p.method === 'CASH').reduce((s, p) => s + p.amount, 0), 0
       );
-      const totalCard = sessionTickets.reduce((sum, t) => 
+      const totalCard = paidTickets.reduce((sum, t) => 
         sum + t.payments.filter(p => p.method === 'CARD').reduce((s, p) => s + p.amount, 0), 0
       );
       
@@ -422,14 +449,23 @@ function reducer(state: AppState, action: Action): AppState {
         totalRevenue,
         totalCash,
         totalCard,
-        ticketCount: sessionTickets.length,
+        ticketCount: paidTickets.length,
         notes,
+        tickets: sessionTickets, // Sauvegarder l'historique complet
       };
+      
+      // Sauvegarder dans localStorage
+      const newClosedSessions = [...state.closedSessions, closedSession];
+      try {
+        localStorage.setItem('quickpos-sessions', JSON.stringify(newClosedSessions));
+      } catch (e) {
+        console.error('Erreur sauvegarde sessions:', e);
+      }
       
       return {
         ...state,
         currentSession: null,
-        closedSessions: [...state.closedSessions, closedSession],
+        closedSessions: newClosedSessions,
         tickets: [],
         tables: initialTables,
         cashBalance: finalCash,

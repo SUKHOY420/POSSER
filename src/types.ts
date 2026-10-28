@@ -97,6 +97,7 @@ export interface Session {
   totalCard: number;
   ticketCount: number;
   notes?: string;
+  tickets: Ticket[]; // Historique complet des tickets de la session
 }
 
 export interface AppState {

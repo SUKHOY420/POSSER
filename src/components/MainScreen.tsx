@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Clock, Users, DollarSign, LogOut, ChefHat, AlertCircle, CheckCircle2, Timer, Settings, Lock, Eye, History, CreditCard, FileText, Power } from 'lucide-react';
+import { Clock, Users, DollarSign, LogOut, ChefHat, AlertCircle, CheckCircle2, Timer, Settings, Lock, Eye, History, CreditCard, FileText, Power, TrendingUp } from 'lucide-react';
 import { usePOS } from '../store';
 import { Ticket } from '../types';
 import TicketDetailModal from './TicketDetailModal';
@@ -8,6 +8,8 @@ import TicketHistoryModal from './TicketHistoryModal';
 import EmergencyPaymentModal from './EmergencyPaymentModal';
 import ReportPrinterModal from './ReportPrinterModal';
 import CloseSessionModal from './CloseSessionModal';
+import SessionHistoryModal from './SessionHistoryModal';
+import OpenSessionModal from './OpenSessionModal';
 
 export default function MainScreen() {
   const { state, dispatch } = usePOS();
@@ -24,6 +26,7 @@ export default function MainScreen() {
   const [emergencyTicket, setEmergencyTicket] = useState<Ticket | null>(null);
   const [showReportPrinter, setShowReportPrinter] = useState(false);
   const [showCloseSession, setShowCloseSession] = useState(false);
+  const [showSessionHistory, setShowSessionHistory] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -103,6 +106,15 @@ export default function MainScreen() {
               </p>
             )}
           </div>
+          <motion.button 
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => setShowSessionHistory(true)}
+            className="p-2 text-slate-400 hover:text-emerald-400 touch-target transition-colors"
+            title="Historique & Rapports"
+          >
+            <TrendingUp className="w-5 h-5" />
+          </motion.button>
           <motion.button 
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
@@ -397,6 +409,20 @@ export default function MainScreen() {
       <AnimatePresence>
         {showCloseSession && (
           <CloseSessionModal onClose={() => setShowCloseSession(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* Session History Modal */}
+      <AnimatePresence>
+        {showSessionHistory && (
+          <SessionHistoryModal onClose={() => setShowSessionHistory(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* Open Session Modal - Affiché quand pas de session en cours */}
+      <AnimatePresence>
+        {!state.currentSession && (
+          <OpenSessionModal />
         )}
       </AnimatePresence>
     </div>
